@@ -50,4 +50,27 @@ if (!visual.viz || !visual.viz.shapes || !visual.viz.hlines || !visual.viz.fills
 if (visual.viz.shapes.length < 1 || visual.viz.hlines.length < 1 || visual.viz.fills.length < 1 || visual.viz.drawings.length < 1) {
   throw new Error("Pine visualization output collections were unexpectedly empty.");
 }
-console.log("Resin " + result.version + " passed: EMA plot series, shapes, hlines, fills, and drawing capture on synthetic bars.");
+const taSource = `//@version=6
+indicator("PineLab TA test")
+smaValue = ta.sma(close, 14)
+rsiValue = ta.rsi(close, 14)
+[macdLine, signalLine, histLine] = ta.macd(close, 12, 26, 9)
+atrValue = ta.atr(14)
+plot(smaValue, "SMA")
+plot(rsiValue, "RSI")
+plot(macdLine, "MACD")
+plot(signalLine, "Signal")
+plot(histLine, "Histogram")
+plot(atrValue, "ATR")
+`;
+const taResult = globalThis.PineLabEngine.execute(taSource, { open, high, low, close, volume, time }, "5");
+if (!taResult.ok) throw new Error("TA functions test failed: " + (taResult.errors || []).join("; "));
+if (!Array.isArray(taResult.plots) || taResult.plots.length !== 6) {
+  throw new Error("Expected six TA output series; got " + (taResult.plots || []).length);
+}
+for (const plot of taResult.plots) {
+  if (!Array.isArray(plot.values) || plot.values.length !== n) {
+    throw new Error("TA output length mismatch for " + plot.title);
+  }
+}
+console.log("Resin " + result.version + " passed: EMA, SMA, RSI, MACD, ATR, plot series, shapes, hlines, fills, and drawing capture.");
