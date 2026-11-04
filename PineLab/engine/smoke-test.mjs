@@ -103,14 +103,21 @@ plot(chartClose, "Chart")
 plot(hourClose, "60m")
 plot(dayClose, "Daily")
 `;
-const mtfResult = globalThis.PineLabEngine.execute(mtfSource, { open, high, low, close, volume, time }, "5", {}, "XAUUSD");
+const mtfData = { open: [], high: [], low: [], close: [], volume: [], time: [] };
+let mtfPrice = 2000;
+for (let i = 0; i < 400; i++) {
+  const o = mtfPrice, cl = o + Math.sin(i / 7) * 1.2 + 0.04;
+  mtfData.open.push(o); mtfData.close.push(cl);
+  mtfData.high.push(Math.max(o, cl) + 0.5); mtfData.low.push(Math.min(o, cl) - 0.5);
+  mtfData.volume.push(100 + i); mtfData.time.push(Date.UTC(2025, 0, 1) + i * 5 * 60_000);
+  mtfPrice = cl;
+}
+const mtfResult = globalThis.PineLabEngine.execute(mtfSource, mtfData, "5", {}, "XAUUSD");
 if (!mtfResult.ok) throw new Error("Higher timeframe request.security failed: " + (mtfResult.errors || []).join("; "));
 if (!Array.isArray(mtfResult.plots) || mtfResult.plots.length !== 3) {
   throw new Error("Expected chart, 60m and daily series; got " + (mtfResult.plots || []).length);
 }
 if (!mtfResult.plots[1].values.some(Number.isFinite) || !mtfResult.plots[2].values.some(Number.isFinite)) {
-  console.log("MTF debug:", JSON.stringify(mtfResult.debug));
-  console.log("MTF samples:", JSON.stringify(mtfResult.plots.map(p => ({title:p.title,first:p.values.slice(0,18),last:p.values.slice(-8)}))));
   throw new Error("Higher timeframe synthetic feeds returned no numeric values.");
 }
 
