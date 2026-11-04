@@ -17,7 +17,8 @@
 <button id="step">شمعة واحدة ◀</button><button id="play">▶ تشغيل</button><button id="reset">إعادة</button><input id="replayRange" type="range" min="20" max="300" value="300">
 </section>
 <section class="editorCard">
-<div class="editorHead"><b>محرر Pine</b><div><button id="save">حفظ</button><button id="run" class="primary">فحص وتشغيل</button></div></div>
+<div class="editorHead"><b>محرر Pine</b><div><button id="save">حفظ</button><button id="toggleIndicator">تفعيل</button><button id="run" class="primary">تشغيل المفعّل</button></div></div>
+<div class="savedRow"><select id="savedScripts" aria-label="المؤشرات المحفوظة"><option value="">المؤشرات المحفوظة</option></select><button id="loadScript">فتح</button></div>
 <input id="scriptName" value="My Indicator" aria-label="اسم المؤشر">
 <textarea id="source" spellcheck="false">//@version=6
 indicator("PineLab Test", overlay=true)
@@ -29,5 +30,6 @@ plot(slow, "EMA 21", color=color.aqua)
 <div id="diagnostics">المحرّك الكامل قيد الدمج. لا يتم الادعاء بتوافق Pine الكامل في هذه النسخة التأسيسية.</div>
 </section>
 </main>
-<script src="resin-engine.js"></script>\n<script src="app.js"></script>
+<script src="resin-engine.js"></script>
+<script src="app.js"></script>
 </body></html>
