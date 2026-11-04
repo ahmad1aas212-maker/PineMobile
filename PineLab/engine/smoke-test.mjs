@@ -152,11 +152,11 @@ if (securityResult.plots[1].values.some(Number.isFinite)) {
 const mtfSource = `//@version=6
 indicator("PineLab MTF test")
 chartClose = close
-hourClose = request.security("NASDAQ:MSFT", "60", close)
-dayClose = request.security("NASDAQ:MSFT", "D", close)
+hourClose = request.security("XAUUSD", "60", close)
+dayClose = request.security("XAUUSD", "D", close)
 plot(chartClose, "Chart")
-plot(hourClose, "60m")
-plot(dayClose, "Daily")
+plot(hourClose, "Real 60m")
+plot(dayClose, "Real Daily")
 `;
 const mtfData = { open: [], high: [], low: [], close: [], volume: [], time: [] };
 let mtfPrice = 2000;
@@ -172,8 +172,8 @@ if (!mtfResult.ok) throw new Error("Higher timeframe request.security failed: " 
 if (!Array.isArray(mtfResult.plots) || mtfResult.plots.length !== 3) {
   throw new Error("Expected chart, 60m and daily series; got " + (mtfResult.plots || []).length);
 }
-if (mtfResult.plots[1].values.some(Number.isFinite) || mtfResult.plots[2].values.some(Number.isFinite)) {
-  throw new Error("Unsupported external ticker MTF data must not be fabricated.");
+if (!mtfResult.plots[1].values.some(Number.isFinite) || !mtfResult.plots[2].values.some(Number.isFinite)) {
+  throw new Error("Same-symbol higher-timeframe request.security must use aggregated chart OHLC.");
 }
 
 
