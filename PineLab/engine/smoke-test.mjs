@@ -89,4 +89,35 @@ if (!Array.isArray(securityResult.plots) || securityResult.plots.length !== 2) {
 if (!securityResult.plots[1].values.some(Number.isFinite)) {
   throw new Error("Synthetic request.security feed returned no numeric values.");
 }
-console.log("Resin " + result.version + " passed: EMA/SMA/RSI/MACD/ATR, visual primitives, and synthetic request.security feed.");
+
+const mtfSource = `//@version=6
+indicator("PineLab MTF test")
+chartClose = close
+hourClose = request.security("NASDAQ:MSFT", "60", close)
+dayClose = request.security("NASDAQ:MSFT", "D", close)
+plot(chartClose, "Chart")
+plot(hourClose, "60m")
+plot(dayClose, "Daily")
+`;
+const mtfResult = globalThis.PineLabEngine.execute(mtfSource, { open, high, low, close, volume, time }, "5", {}, "XAUUSD");
+if (!mtfResult.ok) throw new Error("Higher timeframe request.security failed: " + (mtfResult.errors || []).join("; "));
+if (!Array.isArray(mtfResult.plots) || mtfResult.plots.length !== 3) {
+  throw new Error("Expected chart, 60m and daily series; got " + (mtfResult.plots || []).length);
+}
+if (!mtfResult.plots[1].values.some(Number.isFinite) || !mtfResult.plots[2].values.some(Number.isFinite)) {
+  throw new Error("Higher timeframe synthetic feeds returned no numeric values.");
+}
+const tableSource = `//@version=6
+indicator("PineLab table test", overlay=true)
+var t = table.new(position.top_right, 2, 2)
+if barstate.islast
+    table.cell(t, 0, 0, "PineLab")
+    table.cell(t, 1, 0, "OK")
+    table.cell(t, 0, 1, "Bars")
+    table.cell(t, 1, 1, str.tostring(bar_index + 1))
+`;
+const tableResult = globalThis.PineLabEngine.execute(tableSource, { open, high, low, close, volume, time }, "5");
+if (!tableResult.ok) throw new Error("Table capture test failed: " + (tableResult.errors || []).join("; "));
+if (!tableResult.viz) throw new Error("Expected table visualization metadata.");
+console.log("Table viz probe: " + JSON.stringify(tableResult.viz).slice(0, 2500));
+console.log("Resin " + result.version + " passed: EMA/SMA/RSI/MACD/ATR, visual primitives, multi-symbol request.security, and 60m/D synthetic feeds.");
