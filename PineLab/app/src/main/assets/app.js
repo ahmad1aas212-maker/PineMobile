@@ -2,6 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 let bars=[],cursor=300,timer=null,seed=73421,activePlots=[],activeViz=null,savedScripts=[],enabledScripts=[];
+let viewStart=null,followLatest=true,priceZoom=1,priceShift=0,replayStart=20,dragState=null;
 const DAY=86400000, BASE=Date.UTC(2025,0,1), HISTORY_DAYS=10;
 function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
 function tfMinutes(){const v=$('timeframe').value;return v==='D'?1440:Number(v)}
@@ -11,30 +12,32 @@ function generate(){
  const step=tfMinutes()*60000;
  const count=Math.max(300,Math.min(10000,Math.ceil(HISTORY_DAYS*1440/tfMinutes())));
  for(let i=0;i<count;i++){const o=p,move=(random()-.49)*(p>100?2.2:.008);const c=Math.max(.0001,o+move);const h=Math.max(o,c)+random()*(p>100?1.2:.004);const l=Math.min(o,c)-random()*(p>100?1.2:.004);bars.push({t:BASE+i*step,o,h,l,c,v:100+Math.floor(random()*900)});p=c}
- cursor=bars.length;activePlots=[];activeViz=null;$('replayRange').min=20;$('replayRange').max=bars.length;$('replayRange').value=cursor;executeEnabled(false);draw();
+ cursor=bars.length;viewStart=Math.max(0,cursor-80);followLatest=true;priceZoom=1;priceShift=0;replayStart=20;activePlots=[];activeViz=null;$('replayRange').min=replayStart;$('replayRange').max=bars.length;$('replayRange').value=cursor;executeEnabled(false);draw();
 }
 function draw(){
  const canvas=$('chart'),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
  canvas.width=Math.max(1,Math.floor(rect.width*dpr));canvas.height=Math.max(1,Math.floor(rect.height*dpr));
  const c=canvas.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);const w=rect.width,h=rect.height;
  c.fillStyle='#101827';c.fillRect(0,0,w,h);
- const start=cursor-90,dataStart=Math.max(0,start),visible=bars.slice(dataStart,cursor);if(!visible.length)return;
- const slotCount=180;
+ const slotCount=100;
+ if(viewStart===null)viewStart=Math.max(0,cursor-80);
+ const start=Math.max(0,Math.min(Math.max(0,bars.length-slotCount),Math.floor(viewStart)));
+ const dataStart=Math.max(0,start),dataEnd=Math.min(cursor,start+slotCount),visible=bars.slice(dataStart,dataEnd);if(!visible.length)return;
  let vals=visible.flatMap(b=>[b.l,b.h]);
  for(const p of activePlots)for(let i=dataStart;i<cursor;i++){const v=p.values[i];if(Number.isFinite(v))vals.push(v)}
  if(activeViz&&activeViz.hlines)activeViz.hlines.forEach(q=>{if(Number.isFinite(q.price))vals.push(q.price)});
  if(activeViz&&activeViz.drawings)activeViz.drawings.forEach(d=>{const s=d.state||{};['y','y1','y2','top','bottom'].forEach(k=>{if(Number.isFinite(s[k]))vals.push(s[k])})});
  let lo=Math.min(...vals),hi=Math.max(...vals);const pad=(hi-lo)*.08||1;lo-=pad;hi+=pad;
- const y=v=>h-18-(v-lo)/(hi-lo)*(h-36),cw=w/slotCount;
+ const y=v=>h-18-(((v-lo)/(hi-lo)-0.5)*priceZoom+0.5+priceShift)*(h-36),cw=w/slotCount;
  c.strokeStyle='#263449';c.lineWidth=1;for(let i=1;i<5;i++){let yy=h*i/5;c.beginPath();c.moveTo(0,yy);c.lineTo(w,yy);c.stroke()}
  if(activeViz&&activeViz.bgcolors)activeViz.bgcolors.forEach(bg=>{for(let i=dataStart;i<cursor;i++){const col=(bg.colors&&bg.colors[i])||bg.color;if(!col)continue;c.globalAlpha=.12;c.fillStyle=col;c.fillRect((i-start)*cw,0,cw,h)}c.globalAlpha=1});
  visible.forEach((b,i)=>{const abs=dataStart+i,x=(abs-start+.5)*cw,up=b.c>=b.o;let col=up?'#22c59a':'#f06470';if(activeViz&&activeViz.barcolors){for(const bc of activeViz.barcolors){const q=(bc.colors&&bc.colors[abs])||bc.color;if(q)col=q}}c.strokeStyle=col;c.fillStyle=col;c.beginPath();c.moveTo(x,y(b.h));c.lineTo(x,y(b.l));c.stroke();let top=y(Math.max(b.o,b.c)),bottom=y(Math.min(b.o,b.c));c.fillRect(x-Math.max(1,cw*.28),top,Math.max(2,cw*.56),Math.max(1,bottom-top))});
- if(activeViz&&activeViz.fills)activeViz.fills.forEach(f=>{if(!f.a||!f.b)return;const series=(ref)=>ref.kind==='plot'?(activePlots[ref.index]&&activePlots[ref.index].values):(activeViz.hlines[ref.index]?[...Array(cursor)].map(()=>activeViz.hlines[ref.index].price):null);const a=series(f.a),b=series(f.b);if(!a||!b)return;c.beginPath();let started=false;for(let i=start;i<cursor;i++){if(!Number.isFinite(a[i])||!Number.isFinite(b[i]))continue;const x=(i-start+.5)*cw;if(!started){c.moveTo(x,y(a[i]));started=true}else c.lineTo(x,y(a[i]))}for(let i=cursor-1;i>=dataStart;i--){if(Number.isFinite(b[i]))c.lineTo((i-start+.5)*cw,y(b[i]))}if(started){c.closePath();c.globalAlpha=.16;c.fillStyle=(f.colors&&f.colors[cursor-1])||f.color||'#8294aa';c.fill();c.globalAlpha=1}});
+ if(activeViz&&activeViz.fills)activeViz.fills.forEach(f=>{if(!f.a||!f.b)return;const series=(ref)=>ref.kind==='plot'?(activePlots[ref.index]&&activePlots[ref.index].values):(activeViz.hlines[ref.index]?[...Array(cursor)].map(()=>activeViz.hlines[ref.index].price):null);const a=series(f.a),b=series(f.b);if(!a||!b)return;c.beginPath();let started=false;for(let i=dataStart;i<dataEnd;i++){if(!Number.isFinite(a[i])||!Number.isFinite(b[i]))continue;const x=(i-start+.5)*cw;if(!started){c.moveTo(x,y(a[i]));started=true}else c.lineTo(x,y(a[i]))}for(let i=dataEnd-1;i>=dataStart;i--){if(Number.isFinite(b[i]))c.lineTo((i-start+.5)*cw,y(b[i]))}if(started){c.closePath();c.globalAlpha=.16;c.fillStyle=(f.colors&&f.colors[cursor-1])||f.color||'#8294aa';c.fill();c.globalAlpha=1}});
  activeViz&&activeViz.hlines&&activeViz.hlines.forEach(line=>{if(!Number.isFinite(line.price))return;c.strokeStyle=line.color||'#a5b3c7';c.lineWidth=line.linewidth||1;c.setLineDash(line.linestyle==='dashed'?[6,4]:line.linestyle==='dotted'?[2,3]:[]);c.beginPath();c.moveTo(0,y(line.price));c.lineTo(w,y(line.price));c.stroke();c.setLineDash([])});
  activePlots.forEach((p,pi)=>{const meta=activeViz&&activeViz.plots?activeViz.plots[pi]:null,style=meta&&meta.style||'line',base=meta&&Number.isFinite(meta.histbase)?meta.histbase:0,baseY=y(base),color=(meta&&meta.color)||['#f5a742','#48c9ee','#d48aff','#f078a6'][pi%4];c.lineWidth=meta?Math.max(1,meta.linewidth||2):2;c.strokeStyle=color;c.fillStyle=color;
- if(style==='histogram'||style==='columns'){for(let i=start;i<cursor;i++){const v=p.values[i];if(!Number.isFinite(v))continue;const x=(i-start+.5)*cw,yy=y(v),col=(meta&&meta.colors&&meta.colors[i])||color;c.fillStyle=col;c.fillRect(x-cw*.32,Math.min(yy,baseY),Math.max(1,cw*.64),Math.max(1,Math.abs(baseY-yy)))}return}
- if(style==='circles'||style==='cross'){for(let i=start;i<cursor;i++){const v=p.values[i];if(!Number.isFinite(v))continue;const x=(i-start+.5)*cw,yy=y(v),col=(meta&&meta.colors&&meta.colors[i])||color;c.strokeStyle=col;c.fillStyle=col;if(style==='circles'){c.beginPath();c.arc(x,yy,Math.max(2,c.lineWidth+1),0,Math.PI*2);c.fill()}else{c.beginPath();c.moveTo(x-4,yy);c.lineTo(x+4,yy);c.moveTo(x,yy-4);c.lineTo(x,yy+4);c.stroke()}}return}
- c.beginPath();let begun=false,points=[];for(let i=start;i<cursor;i++){const v=p.values[i];if(!Number.isFinite(v)){begun=false;continue}const x=(i-start+.5)*cw,yy=y(v);if(!begun){c.moveTo(x,yy);begun=true}else if(style==='stepline'){const prev=p.values[i-1];c.lineTo(x,y(prev));c.lineTo(x,yy)}else c.lineTo(x,yy);points.push([x,yy])}c.stroke();
+ if(style==='histogram'||style==='columns'){for(let i=dataStart;i<dataEnd;i++){const v=p.values[i];if(!Number.isFinite(v))continue;const x=(i-start+.5)*cw,yy=y(v),col=(meta&&meta.colors&&meta.colors[i])||color;c.fillStyle=col;c.fillRect(x-cw*.32,Math.min(yy,baseY),Math.max(1,cw*.64),Math.max(1,Math.abs(baseY-yy)))}return}
+ if(style==='circles'||style==='cross'){for(let i=dataStart;i<dataEnd;i++){const v=p.values[i];if(!Number.isFinite(v))continue;const x=(i-start+.5)*cw,yy=y(v),col=(meta&&meta.colors&&meta.colors[i])||color;c.strokeStyle=col;c.fillStyle=col;if(style==='circles'){c.beginPath();c.arc(x,yy,Math.max(2,c.lineWidth+1),0,Math.PI*2);c.fill()}else{c.beginPath();c.moveTo(x-4,yy);c.lineTo(x+4,yy);c.moveTo(x,yy-4);c.lineTo(x,yy+4);c.stroke()}}return}
+ c.beginPath();let begun=false,points=[];for(let i=dataStart;i<dataEnd;i++){const v=p.values[i];if(!Number.isFinite(v)){begun=false;continue}const x=(i-start+.5)*cw,yy=y(v);if(!begun){c.moveTo(x,yy);begun=true}else if(style==='stepline'){const prev=p.values[i-1];c.lineTo(x,y(prev));c.lineTo(x,yy)}else c.lineTo(x,yy);points.push([x,yy])}c.stroke();
  if(style==='area'&&points.length){c.beginPath();c.moveTo(points[0][0],baseY);points.forEach(pt=>c.lineTo(pt[0],pt[1]));c.lineTo(points[points.length-1][0],baseY);c.closePath();c.globalAlpha=.18;c.fillStyle=color;c.fill();c.globalAlpha=1}
  });
  if(activeViz&&activeViz.candles)activeViz.candles.concat(activeViz.plotbars||[]).forEach(series=>{for(let i=dataStart;i<cursor;i++){const j=i-start,o=series.open[i],hh=series.high[i],ll=series.low[i],cl=series.close[i];if(![o,hh,ll,cl].every(Number.isFinite))continue;const x=(j+.5)*cw,col=(series.colors&&series.colors[i])||series.color||(cl>=o?'#22c59a':'#f06470');c.strokeStyle=series.wickcolor||col;c.fillStyle=col;c.lineWidth=1;c.beginPath();c.moveTo(x,y(hh));c.lineTo(x,y(ll));c.stroke();const top=y(Math.max(o,cl)),bottom=y(Math.min(o,cl)),body=Math.max(1,bottom-top),bw=Math.max(2,cw*.48);c.fillRect(x-bw/2,top,bw,body);if(series.bordercolor){c.strokeStyle=series.bordercolor;c.strokeRect(x-bw/2,top,bw,body)}}});
@@ -46,11 +49,13 @@ function draw(){
  const last=visible[visible.length-1];$('price').textContent=last.c.toFixed(last.c>100?2:5);$('chartTitle').textContent=$('symbol').value+' · '+$('timeframe').selectedOptions[0].text;$('barsLabel').textContent=cursor+' / '+bars.length+' شمعة';$('cursorLabel').textContent='الشمعة '+cursor;
 }
 function stop(){if(timer){clearInterval(timer);timer=null}$('play').textContent='▶ تشغيل'}
-function advance(){if(cursor<bars.length){cursor++;$('replayRange').value=cursor;executeEnabled(false);draw()}else stop()}
+function advance(){if(cursor<bars.length){cursor++;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-80);executeEnabled(false);draw()}else stop()}
 $('regen').onclick=generate;$('symbol').onchange=generate;$('timeframe').onchange=generate;
-$('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop();return}$('play').textContent='إيقاف';timer=setInterval(advance,350)};
-$('reset').onclick=()=>{stop();cursor=20;$('replayRange').value=cursor;executeEnabled(false);draw()};
-$('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);executeEnabled(false);draw()};
+$('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop();return}$('play').textContent='إيقاف';timer=setInterval(advance,Number($('replaySpeed').value)||500)};
+$('reset').onclick=()=>{stop();cursor=replayStart;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-80);executeEnabled(false);draw()};
+$('replaySpeed').onchange=()=>{if(timer){stop();$('play').click()}};
+$('setReplayStart').onclick=()=>{replayStart=cursor;$('replayRange').min=replayStart;$('replayRange').value=cursor;$('diagnostics').textContent='تم تحديد بداية إعادة التشغيل عند الشمعة '+replayStart};
+$('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);if(followLatest)viewStart=Math.max(0,cursor-80);executeEnabled(false);draw()};
 function persistScripts(){
  localStorage.setItem('pinelab:scripts',JSON.stringify(savedScripts));
  localStorage.setItem('pinelab:enabled',JSON.stringify(enabledScripts));
