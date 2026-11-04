@@ -17,9 +17,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      - name: Install and bundle Resin locally
+        working-directory: PineLab/engine
+        run: |
+          npm install --no-audit --no-fund
+          ./node_modules/.bin/esbuild entry.js --bundle --format=iife --platform=browser --target=es2020 --outfile=../app/src/main/assets/resin-engine.js
       - name: Build debug APK
         working-directory: PineLab
         run: gradle assembleDebug
