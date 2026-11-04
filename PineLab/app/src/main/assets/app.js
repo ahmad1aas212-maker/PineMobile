@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 let bars=[],cursor=300,timer=null,seed=73421,activePlots=[],activeViz=null,savedScripts=[],enabledScripts=[];
-let viewStart=null,followLatest=true,priceZoom=1,priceShift=0,replayStart=20,dragState=null;
+let viewStart=null,followLatest=true,priceZoom=1,priceShift=0,replayStart=20,dragState=null,visibleBars=100;const activePointers=new Map();let pinchState=null;
 const DAY=86400000, BASE=Date.UTC(2025,0,1), HISTORY_DAYS=10;
 function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
 function tfMinutes(){const v=$('timeframe').value;return v==='D'?1440:Number(v)}
@@ -12,23 +12,20 @@ function generate(){
  const step=tfMinutes()*60000;
  const count=Math.max(300,Math.min(10000,Math.ceil(HISTORY_DAYS*1440/tfMinutes())));
  for(let i=0;i<count;i++){const o=p,move=(random()-.49)*(p>100?2.2:.008);const c=Math.max(.0001,o+move);const h=Math.max(o,c)+random()*(p>100?1.2:.004);const l=Math.min(o,c)-random()*(p>100?1.2:.004);bars.push({t:BASE+i*step,o,h,l,c,v:100+Math.floor(random()*900)});p=c}
- cursor=bars.length;viewStart=Math.max(0,cursor-80);followLatest=true;priceZoom=1;priceShift=0;replayStart=20;activePlots=[];activeViz=null;$('replayRange').min=replayStart;$('replayRange').max=bars.length;$('replayRange').value=cursor;executeEnabled(false);draw();
+ cursor=bars.length;viewStart=Math.max(0,cursor-visibleBars*.8);followLatest=true;priceZoom=1;priceShift=0;replayStart=20;activePlots=[];activeViz=null;$('replayRange').min=replayStart;$('replayRange').max=bars.length;$('replayRange').value=cursor;executeEnabled(false);draw();
 }
 function draw(){
  const canvas=$('chart'),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
- canvas.width=Math.max(1,Math.floor(rect.width*dpr));canvas.height=Math.max(1,Math.floor(rect.height*dpr));
+ const pixelW=Math.max(1,Math.floor(rect.width*dpr)),pixelH=Math.max(1,Math.floor(rect.height*dpr));if(canvas.width!==pixelW||canvas.height!==pixelH){canvas.width=pixelW;canvas.height=pixelH;}
  const c=canvas.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);const w=rect.width,h=rect.height;
  c.fillStyle='#101827';c.fillRect(0,0,w,h);
- const slotCount=100;
- if(viewStart===null)viewStart=Math.max(0,cursor-80);
- const start=Math.max(0,Math.min(Math.max(0,bars.length-slotCount),Math.floor(viewStart)));
- const dataStart=Math.max(0,start),dataEnd=Math.min(cursor,start+slotCount),visible=bars.slice(dataStart,dataEnd);if(!visible.length)return;
+ if(viewStart===null)viewStart=Math.max(0,cursor-visibleBars*.8);viewStart=Math.max(0,Math.min(Math.max(0,cursor-1),viewStart));const start=viewStart,dataStart=Math.max(0,Math.floor(start)),dataEnd=Math.min(cursor,Math.ceil(start+visibleBars)),visible=bars.slice(dataStart,dataEnd);if(!visible.length)return;
  let vals=visible.flatMap(b=>[b.l,b.h]);
  for(const p of activePlots)for(let i=dataStart;i<cursor;i++){const v=p.values[i];if(Number.isFinite(v))vals.push(v)}
  if(activeViz&&activeViz.hlines)activeViz.hlines.forEach(q=>{if(Number.isFinite(q.price))vals.push(q.price)});
  if(activeViz&&activeViz.drawings)activeViz.drawings.forEach(d=>{const s=d.state||{};['y','y1','y2','top','bottom'].forEach(k=>{if(Number.isFinite(s[k]))vals.push(s[k])})});
  let lo=Math.min(...vals),hi=Math.max(...vals);const pad=(hi-lo)*.08||1;lo-=pad;hi+=pad;
- const y=v=>h-18-(((v-lo)/(hi-lo)-0.5)*priceZoom+0.5+priceShift)*(h-36),cw=w/slotCount;
+ const y=v=>h-18-(((v-lo)/(hi-lo)-0.5)*priceZoom+0.5+priceShift)*(h-36),cw=w/visibleBars;
  c.strokeStyle='#263449';c.lineWidth=1;for(let i=1;i<5;i++){let yy=h*i/5;c.beginPath();c.moveTo(0,yy);c.lineTo(w,yy);c.stroke()}
  if(activeViz&&activeViz.bgcolors)activeViz.bgcolors.forEach(bg=>{for(let i=dataStart;i<cursor;i++){const col=(bg.colors&&bg.colors[i])||bg.color;if(!col)continue;c.globalAlpha=.12;c.fillStyle=col;c.fillRect((i-start)*cw,0,cw,h)}c.globalAlpha=1});
  visible.forEach((b,i)=>{const abs=dataStart+i,x=(abs-start+.5)*cw,up=b.c>=b.o;let col=up?'#22c59a':'#f06470';if(activeViz&&activeViz.barcolors){for(const bc of activeViz.barcolors){const q=(bc.colors&&bc.colors[abs])||bc.color;if(q)col=q}}c.strokeStyle=col;c.fillStyle=col;c.beginPath();c.moveTo(x,y(b.h));c.lineTo(x,y(b.l));c.stroke();let top=y(Math.max(b.o,b.c)),bottom=y(Math.min(b.o,b.c));c.fillRect(x-Math.max(1,cw*.28),top,Math.max(2,cw*.56),Math.max(1,bottom-top))});
@@ -48,14 +45,15 @@ function draw(){
  if(activeViz&&activeViz.drawings)activeViz.drawings.forEach(d=>{const s=d.state||{};c.save();if(d.kind==='line'){const x1=xCoord(s.x1),x2=xCoord(s.x2);if(Number.isFinite(x1)&&Number.isFinite(x2)&&Number.isFinite(s.y1)&&Number.isFinite(s.y2)){c.strokeStyle=s.color||'#f4c95d';c.lineWidth=s.width||1.5;c.setLineDash(s.style==='dashed'?[7,5]:s.style==='dotted'?[2,4]:[]);const ext=s.extend||'none',left=ext==='left'||ext==='both',right=ext==='right'||ext==='both';let ax=x1,bx=x2;if(left||right){const dx=x2-x1,dy=y(s.y2)-y(s.y1);if(dx!==0){if(left)ax=0;if(right)bx=w;const yy1=y(s.y1)+(ax-x1)*(dy/dx),yy2=y(s.y1)+(bx-x1)*(dy/dx);c.beginPath();c.moveTo(ax,yy1);c.lineTo(bx,yy2)}else{c.beginPath();c.moveTo(x1,0);c.lineTo(x1,h)}}else{c.beginPath();c.moveTo(x1,y(s.y1));c.lineTo(x2,y(s.y2))}c.stroke();c.setLineDash([])}}else if(d.kind==='box'){const x1=xCoord(s.left),x2=xCoord(s.right);if(Number.isFinite(x1)&&Number.isFinite(x2)&&Number.isFinite(s.top)&&Number.isFinite(s.bottom)){const left=Math.min(x1,x2),top=y(Math.max(s.top,s.bottom)),ww=Math.abs(x2-x1),hh=Math.abs(y(s.top)-y(s.bottom));c.globalAlpha=.14;c.fillStyle=s.bgcolor||'#5c91c9';c.fillRect(left,top,ww,hh);c.globalAlpha=1;c.strokeStyle=s.border_color||'#5c91c9';c.lineWidth=s.border_width||1;c.strokeRect(left,top,ww,hh);if(s.text){c.font='11px Arial';c.fillStyle=s.text_color||'#ffffff';c.fillText(s.text,left+4,top+14)}}}else if(d.kind==='label'){const x=xCoord(s.x);if(Number.isFinite(x)&&Number.isFinite(s.y)){c.font=(s.size==='large'?'16px':s.size==='small'?'10px':'12px')+' Arial';c.fillStyle=s.textcolor||'#ffffff';c.textAlign='left';c.fillText(s.text||'',x,y(s.y))}}c.restore()});
  const last=visible[visible.length-1];$('price').textContent=last.c.toFixed(last.c>100?2:5);$('chartTitle').textContent=$('symbol').value+' · '+$('timeframe').selectedOptions[0].text;$('barsLabel').textContent=cursor+' / '+bars.length+' شمعة';$('cursorLabel').textContent='الشمعة '+cursor;
 }
-function stop(){if(timer){clearInterval(timer);timer=null}$('play').textContent='▶ تشغيل'}
-function advance(){if(cursor<bars.length){cursor++;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-80);executeEnabled(false);draw()}else stop()}
+function stop(){if(timer){clearTimeout(timer);timer=null}$('play').textContent='▶ تشغيل'}
+function advance(){if(cursor<bars.length){cursor++;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);executeEnabled(false);draw();return true}stop();return false}
+function scheduleReplay(){if(!timer)return;timer=setTimeout(()=>{timer=null;if(advance())scheduleReplay()},Math.max(16,Number($('replaySpeed').value)||500))}
 $('regen').onclick=generate;$('symbol').onchange=generate;$('timeframe').onchange=generate;
-$('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop();return}$('play').textContent='إيقاف';timer=setInterval(advance,Number($('replaySpeed').value)||500)};
-$('reset').onclick=()=>{stop();cursor=replayStart;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-80);executeEnabled(false);draw()};
-$('replaySpeed').onchange=()=>{if(timer){stop();$('play').click()}};
+$('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop();return}$('play').textContent='إيقاف';scheduleReplay()};
+$('reset').onclick=()=>{stop();cursor=replayStart;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);executeEnabled(false);draw()};
+$('replaySpeed').onchange=()=>{if(timer){stop();$('play').textContent='إيقاف';scheduleReplay()}};
 $('setReplayStart').onclick=()=>{replayStart=cursor;$('replayRange').min=replayStart;$('replayRange').value=cursor;$('diagnostics').textContent='تم تحديد بداية إعادة التشغيل عند الشمعة '+replayStart};
-$('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);if(followLatest)viewStart=Math.max(0,cursor-80);executeEnabled(false);draw()};
+$('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);executeEnabled(false);draw()};
 function persistScripts(){
  localStorage.setItem('pinelab:scripts',JSON.stringify(savedScripts));
  localStorage.setItem('pinelab:enabled',JSON.stringify(enabledScripts));
@@ -133,13 +131,25 @@ function restore(){
  if(savedScripts.length){const first=savedScripts[0];$('scriptName').value=first.name;$('source').value=first.source;if(!enabledScripts.length)enabledScripts.push(first.name);refreshSaved();executeEnabled(false);draw()}
 }
 const chartCanvas=$('chart');
-$('fitChart').onclick=()=>{followLatest=true;viewStart=Math.max(0,cursor-80);priceZoom=1;priceShift=0;draw()};
+$('fitChart').onclick=()=>{followLatest=true;visibleBars=Math.min(100,Math.max(20,cursor));viewStart=Math.max(0,cursor-visibleBars*.8);priceZoom=1;priceShift=0;draw()};
 $('expandChart').onclick=()=>{const card=chartCanvas.closest('.chartCard');card.classList.toggle('fullscreen');$('expandChart').textContent=card.classList.contains('fullscreen')?'تصغير':'تكبير';setTimeout(draw,80)};
-chartCanvas.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;chartCanvas.setPointerCapture(e.pointerId);chartCanvas.classList.add('dragging');dragState={x:e.clientX,y:e.clientY,start:viewStart===null?Math.max(0,cursor-80):viewStart,shift:priceShift,zoom:priceZoom};followLatest=false});
-chartCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const rect=chartCanvas.getBoundingClientRect(),slots=100,cw=rect.width/slots;viewStart=dragState.start-(e.clientX-dragState.x)/cw;priceShift=dragState.shift+(e.clientY-dragState.y)/(rect.height-36)*priceZoom;draw()});
-function endChartDrag(){dragState=null;chartCanvas.classList.remove('dragging')}
-chartCanvas.addEventListener('pointerup',endChartDrag);chartCanvas.addEventListener('pointercancel',endChartDrag);chartCanvas.addEventListener('lostpointercapture',endChartDrag);
-chartCanvas.addEventListener('wheel',e=>{e.preventDefault();const factor=e.deltaY<0?1.12:0.89;priceZoom=Math.max(.35,Math.min(8,priceZoom*factor));draw()},{passive:false});
+function pointerDistance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function pointerMidpoint(a,b){return {x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
+chartCanvas.addEventListener('pointerdown',e=>{
+ if(e.pointerType==='mouse'&&e.button!==0)return;
+ chartCanvas.setPointerCapture(e.pointerId);activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});followLatest=false;chartCanvas.classList.add('dragging');
+ if(activePointers.size===1)dragState={x:e.clientX,y:e.clientY,start:viewStart===null?Math.max(0,cursor-visibleBars*.8):viewStart,shift:priceShift};
+ else if(activePointers.size===2){const pts=[...activePointers.values()],mid=pointerMidpoint(pts[0],pts[1]),rect=chartCanvas.getBoundingClientRect();pinchState={distance:Math.max(1,pointerDistance(pts[0],pts[1])),visible:visibleBars,priceZoom,anchor:viewStart+(mid.x-rect.left)/rect.width*visibleBars,midY:mid.y};dragState=null;}
+});
+chartCanvas.addEventListener('pointermove',e=>{
+ if(!activePointers.has(e.pointerId))return;activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const rect=chartCanvas.getBoundingClientRect();
+ if(activePointers.size>=2&&pinchState){const pts=[...activePointers.values()],mid=pointerMidpoint(pts[0],pts[1]),distance=Math.max(1,pointerDistance(pts[0],pts[1])),ratio=pinchState.distance/distance,mx=(mid.x-rect.left)/rect.width;
+ visibleBars=Math.max(8,Math.min(500,pinchState.visible*ratio));viewStart=pinchState.anchor-mx*visibleBars;priceZoom=Math.max(.25,Math.min(12,pinchState.priceZoom/ratio));priceShift+=(pinchState.midY-mid.y)/(rect.height-36)*priceZoom;draw();return;}
+ if(dragState&&activePointers.size===1){viewStart=dragState.start-(e.clientX-dragState.x)/(rect.width/visibleBars);priceShift=dragState.shift+(e.clientY-dragState.y)/(rect.height-36)*priceZoom;draw();}
+});
+function releasePointer(e){activePointers.delete(e.pointerId);if(activePointers.size<2)pinchState=null;if(activePointers.size===1){const p=[...activePointers.values()][0];dragState={x:p.x,y:p.y,start:viewStart,shift:priceShift};}else dragState=null;if(activePointers.size===0)chartCanvas.classList.remove('dragging');}
+chartCanvas.addEventListener('pointerup',releasePointer);chartCanvas.addEventListener('pointercancel',releasePointer);chartCanvas.addEventListener('lostpointercapture',releasePointer);
+chartCanvas.addEventListener('wheel',e=>{e.preventDefault();const rect=chartCanvas.getBoundingClientRect(),x=(e.clientX-rect.left)/rect.width;if(e.shiftKey){const old=priceZoom;priceZoom=Math.max(.25,Math.min(12,priceZoom*(e.deltaY<0?1.12:.89)));priceShift+=(priceZoom-old)*(0.5-priceShift);}else{const old=visibleBars;visibleBars=Math.max(8,Math.min(500,visibleBars*(e.deltaY<0?.88:1.136)));viewStart=viewStart+x*old-x*visibleBars;}followLatest=false;draw();},{passive:false});
 chartCanvas.addEventListener('dblclick',()=>$('fitChart').click());
 window.addEventListener('resize',draw);generate();restore();
 })();
