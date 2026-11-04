@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id);
-let bars=[],cursor=300,timer=null,seed=73421,activePlots=[],activeViz=null;
+let bars=[],cursor=300,timer=null,seed=73421,activePlots=[],activeViz=null,savedScripts=[],enabledScripts=[];
 const DAY=86400000, BASE=Date.UTC(2025,0,1);
 function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
 function tfMinutes(){const v=$('timeframe').value;return v==='D'?1440:Number(v)}
@@ -39,16 +39,64 @@ $('regen').onclick=generate;$('symbol').onchange=generate;$('timeframe').onchang
 $('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop();return}$('play').textContent='إيقاف';timer=setInterval(advance,350)};
 $('reset').onclick=()=>{stop();cursor=20;$('replayRange').value=cursor;draw()};
 $('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);draw()};
-$('save').onclick=()=>{const n=$('scriptName').value.trim()||'My Indicator';localStorage.setItem('pine:'+n,$('source').value);if(window.PineLab)PineLab.saveScript(n,$('source').value);$('diagnostics').textContent='تم حفظ النص محلياً: '+n};
+function persistScripts(){
+ localStorage.setItem('pinelab:scripts',JSON.stringify(savedScripts));
+ try{if(window.PineLab)savedScripts.forEach(s=>PineLab.saveScript(s.name,s.source))}catch(e){}
+}
+function refreshSaved(){
+ const select=$('savedScripts'),selected=select.value;
+ select.innerHTML='<option value="">المؤشرات المحفوظة</option>';
+ savedScripts.forEach(s=>{const o=document.createElement('option');o.value=s.name;o.textContent=(enabledScripts.includes(s.name)?'● ':'○ ')+s.name;select.appendChild(o)});
+ if(savedScripts.some(s=>s.name===selected))select.value=selected;
+ $('toggleIndicator').textContent=enabledScripts.includes($('scriptName').value.trim())?'إيقاف':'تفعيل';
+}
+function loadSaved(){
+ try{savedScripts=JSON.parse(localStorage.getItem('pinelab:scripts')||'[]')}catch(e){savedScripts=[]}
+ try{const native=window.PineLab?JSON.parse(PineLab.loadScripts()):[];native.forEach(s=>{if(!savedScripts.some(x=>x.name===s.name))savedScripts.push(s)})}catch(e){}
+ refreshSaved();
+}
+$('save').onclick=()=>{
+ const n=$('scriptName').value.trim()||'My Indicator',source=$('source').value;
+ const i=savedScripts.findIndex(s=>s.name===n);
+ if(i>=0)savedScripts[i].source=source;else savedScripts.push({name:n,source});
+ if(!enabledScripts.includes(n))enabledScripts.push(n);
+ persistScripts();refreshSaved();
+ $('diagnostics').textContent='تم حفظ المؤشر وتفعيله: '+n;
+};
+$('loadScript').onclick=()=>{
+ const n=$('savedScripts').value,s=savedScripts.find(x=>x.name===n);
+ if(!s)return;
+ $('scriptName').value=s.name;$('source').value=s.source;refreshSaved();
+ $('diagnostics').textContent='تم فتح المؤشر: '+n;
+};
+$('toggleIndicator').onclick=()=>{
+ const n=$('scriptName').value.trim()||'My Indicator';
+ if(!savedScripts.some(s=>s.name===n)){$('diagnostics').textContent='احفظ المؤشر أولاً ثم فعّله.';return}
+ if(enabledScripts.includes(n))enabledScripts=enabledScripts.filter(x=>x!==n);else enabledScripts.push(n);
+ refreshSaved();$('diagnostics').textContent=(enabledScripts.includes(n)?'تم تفعيل ':'تم إيقاف ')+n;
+};
 $('run').onclick=()=>{
  const engine=window.PineLabEngine;
- if(!engine){$('diagnostics').textContent='محرك Pine غير موجود في هذه النسخة. أعد البناء بعد نجاح خطوة تجهيز المحرك.';return}
+ if(!engine){$('diagnostics').textContent='محرك Pine غير موجود في هذه النسخة.';return}
+ const active=savedScripts.filter(s=>enabledScripts.includes(s.name));
+ if(!active.length){$('diagnostics').textContent='لا توجد مؤشرات مفعّلة. احفظ مؤشراً وفعّله أولاً.';return}
  const data={open:bars.slice(0,cursor).map(b=>b.o),high:bars.slice(0,cursor).map(b=>b.h),low:bars.slice(0,cursor).map(b=>b.l),close:bars.slice(0,cursor).map(b=>b.c),volume:bars.slice(0,cursor).map(b=>b.v),time:bars.slice(0,cursor).map(b=>b.t)};
- const out=engine.execute($('source').value,data,tfString());
- if(!out.ok){activePlots=[];activeViz=null;draw();$('diagnostics').textContent='خطأ Pine:\n'+(out.errors||['تعذر تشغيل الكود']).join('\n');return}
- activePlots=out.plots||[];activeViz=out.viz||null;draw();
- $('diagnostics').textContent='نجح التنفيذ بواسطة Resin '+out.version+' — '+activePlots.length+' سلسلة رسم. '+(activeViz&&activeViz.shapes?activeViz.shapes.length+' مجموعات علامات.':'');
+ const outputs=[];
+ for(const s of active){
+  const out=engine.execute(s.source,data,tfString());
+  if(!out.ok){$('diagnostics').textContent='خطأ في '+s.name+':\\n'+(out.errors||['تعذر التشغيل']).join('\\n');return}
+  outputs.push(out);
+ }
+ activePlots=outputs.flatMap(o=>o.plots||[]);
+ const keys=['shapes','hlines','fills','drawings','bgcolors','barcolors','plots'];
+ activeViz={};
+ keys.forEach(k=>activeViz[k]=outputs.flatMap(o=>o.viz&&o.viz[k]?(Array.isArray(o.viz[k])?o.viz[k]:[o.viz[k]]):[]));
+ draw();
+ $('diagnostics').textContent='نجح تشغيل '+active.length+' مؤشر/مؤشرات — '+activePlots.length+' سلسلة رسم. المحرك Resin '+outputs[0].version+'.';
 };
-function restore(){try{const a=window.PineLab?JSON.parse(PineLab.loadScripts()):[];if(a.length){$('scriptName').value=a[0].name;$('source').value=a[0].source}}catch(e){}}
+function restore(){
+ loadSaved();
+ if(savedScripts.length){const first=savedScripts[0];$('scriptName').value=first.name;$('source').value=first.source;if(!enabledScripts.length)enabledScripts.push(first.name);refreshSaved()}
+}
 window.addEventListener('resize',draw);generate();restore();
 })();
