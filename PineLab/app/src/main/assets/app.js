@@ -52,7 +52,7 @@ function draw(){
  const dateFmt=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Amman',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
  for(let k=0;k<=4;k++){const xx=w*k/4,idx=Math.max(0,Math.min(cursor-1,Math.round(start+k*visibleBars/4))),label=bars[idx]?dateFmt.format(new Date(bars[idx].t)):'—';c.strokeStyle='#263449';c.beginPath();c.moveTo(xx+.5,0);c.lineTo(xx+.5,h);c.stroke();c.fillStyle='#b7c4d6';c.fillText(label,Math.max(26,Math.min(w-26,xx)),h+14);}
  c.restore();
- const last=visible[visible.length-1];$('price').textContent=last.c.toFixed(last.c>100?2:5);$('chartTitle').textContent=$('symbol').value+' · '+$('timeframe').selectedOptions[0].text;$('barsLabel').textContent=cursor+' / '+bars.length+' شمعة';$('cursorLabel').textContent='الشمعة '+cursor;
+ const last=visible[visible.length-1];$('price').textContent=last.c.toFixed(last.c>100?2:5);$('chartTitle').textContent=$('symbol').value+' · '+$('timeframe').selectedOptions[0].text;$('barsLabel').textContent='بيانات اصطناعية · '+cursor+' / '+bars.length+' شمعة';$('cursorLabel').textContent=bars[dataEnd-1]?'الوقت '+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Amman',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(bars[dataEnd-1].t)):'—';
 }
 function stop(){replayPlaying=false;if(timer){clearTimeout(timer);timer=null}$('play').textContent='▶ تشغيل'}
 function advance(){if(cursor<bars.length){cursor++;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);executeEnabled(false);draw();return true}stop();return false}
