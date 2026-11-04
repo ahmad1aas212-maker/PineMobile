@@ -1,6 +1,6 @@
 import { transpile, run, VERSION } from "./vendor/resin/src/index.ts";
 
-function syntheticFeed(chartBars, symbol) {
+function syntheticFeed(chartBars, symbol, chartTf) {
   const name = String(symbol || "SYNTH").toUpperCase();
   const first = chartBars.close[0] || 1;
   const target = name.includes("XAU") ? 2350 :
@@ -30,7 +30,7 @@ function syntheticFeed(chartBars, symbol) {
     volume.push(chartBars.volume ? chartBars.volume[i] || 0 : 0);
     previous = c;
   }
-  return { open, high, low, close, volume, time };
+  return { open, high, low, close, volume, time, timeframe: String(chartTf || "5") };
 }
 
 function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
@@ -49,7 +49,7 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
     for (const requestedSymbol of requested) {
       const key = String(requestedSymbol);
       if (key && key.toUpperCase() !== String(symbol).toUpperCase()) {
-        security[key] = syntheticFeed(bars, key);
+        security[key] = syntheticFeed(bars, key, chartTf);
       }
     }
     const result = run(compiled, bars, { inputs, security });
