@@ -8,6 +8,10 @@ on:
       - '.github/workflows/pinelab-android-build.yml'
   workflow_dispatch:
 
+concurrency:
+  group: pinelab-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
