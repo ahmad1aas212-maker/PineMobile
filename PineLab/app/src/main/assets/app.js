@@ -20,6 +20,8 @@ function draw(){
  const start=Math.max(0,cursor-90),visible=bars.slice(start,cursor);if(!visible.length)return;
  let vals=visible.flatMap(b=>[b.l,b.h]);
  for(const p of activePlots)for(let i=start;i<cursor;i++){const v=p.values[i];if(Number.isFinite(v))vals.push(v)}
+ if(activeViz&&activeViz.hlines)activeViz.hlines.forEach(q=>{if(Number.isFinite(q.price))vals.push(q.price)});
+ if(activeViz&&activeViz.drawings)activeViz.drawings.forEach(d=>{const s=d.state||{};['y','y1','y2','top','bottom'].forEach(k=>{if(Number.isFinite(s[k]))vals.push(s[k])})});
  let lo=Math.min(...vals),hi=Math.max(...vals);const pad=(hi-lo)*.08||1;lo-=pad;hi+=pad;
  const y=v=>h-18-(v-lo)/(hi-lo)*(h-36),cw=w/visible.length;
  c.strokeStyle='#263449';c.lineWidth=1;for(let i=1;i<5;i++){let yy=h*i/5;c.beginPath();c.moveTo(0,yy);c.lineTo(w,yy);c.stroke()}
@@ -34,11 +36,11 @@ function draw(){
  const last=visible[visible.length-1];$('price').textContent=last.c.toFixed(last.c>100?2:5);$('chartTitle').textContent=$('symbol').value+' · '+$('timeframe').selectedOptions[0].text;$('barsLabel').textContent=cursor+' / '+bars.length+' شمعة';$('cursorLabel').textContent='الشمعة '+cursor;
 }
 function stop(){if(timer){clearInterval(timer);timer=null}$('play').textContent='▶ تشغيل'}
-function advance(){if(cursor<bars.length){cursor++;$('replayRange').value=cursor;draw()}else stop()}
+function advance(){if(cursor<bars.length){cursor++;$('replayRange').value=cursor;executeEnabled(false);draw()}else stop()}
 $('regen').onclick=generate;$('symbol').onchange=generate;$('timeframe').onchange=generate;
 $('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop();return}$('play').textContent='إيقاف';timer=setInterval(advance,350)};
-$('reset').onclick=()=>{stop();cursor=20;$('replayRange').value=cursor;draw()};
-$('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);draw()};
+$('reset').onclick=()=>{stop();cursor=20;$('replayRange').value=cursor;executeEnabled(false);draw()};
+$('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);executeEnabled(false);draw()};
 function persistScripts(){
  localStorage.setItem('pinelab:scripts',JSON.stringify(savedScripts));
  localStorage.setItem('pinelab:enabled',JSON.stringify(enabledScripts));
@@ -77,25 +79,26 @@ $('toggleIndicator').onclick=()=>{
  if(enabledScripts.includes(n))enabledScripts=enabledScripts.filter(x=>x!==n);else enabledScripts.push(n);
  refreshSaved();$('diagnostics').textContent=(enabledScripts.includes(n)?'تم تفعيل ':'تم إيقاف ')+n;
 };
-$('run').onclick=()=>{
+function executeEnabled(showStatus){
  const engine=window.PineLabEngine;
- if(!engine){$('diagnostics').textContent='محرك Pine غير موجود في هذه النسخة.';return}
+ if(!engine){if(showStatus)$('diagnostics').textContent='محرك Pine غير موجود في هذه النسخة.';return false}
  const active=savedScripts.filter(s=>enabledScripts.includes(s.name));
- if(!active.length){$('diagnostics').textContent='لا توجد مؤشرات مفعّلة. احفظ مؤشراً وفعّله أولاً.';return}
+ if(!active.length){activePlots=[];activeViz=null;if(showStatus)$('diagnostics').textContent='لا توجد مؤشرات مفعّلة.';return false}
  const data={open:bars.slice(0,cursor).map(b=>b.o),high:bars.slice(0,cursor).map(b=>b.h),low:bars.slice(0,cursor).map(b=>b.l),close:bars.slice(0,cursor).map(b=>b.c),volume:bars.slice(0,cursor).map(b=>b.v),time:bars.slice(0,cursor).map(b=>b.t)};
  const outputs=[];
  for(const s of active){
   const out=engine.execute(s.source,data,tfString());
-  if(!out.ok){$('diagnostics').textContent='خطأ في '+s.name+':\\n'+(out.errors||['تعذر التشغيل']).join('\\n');return}
+  if(!out.ok){activePlots=[];activeViz=null;if(showStatus)$('diagnostics').textContent='خطأ في '+s.name+':\\n'+(out.errors||['تعذر التشغيل']).join('\\n');return false}
   outputs.push(out);
  }
  activePlots=outputs.flatMap(o=>o.plots||[]);
  const keys=['shapes','hlines','fills','drawings','bgcolors','barcolors','plots'];
  activeViz={};
  keys.forEach(k=>activeViz[k]=outputs.flatMap(o=>o.viz&&o.viz[k]?(Array.isArray(o.viz[k])?o.viz[k]:[o.viz[k]]):[]));
- draw();
- $('diagnostics').textContent='نجح تشغيل '+active.length+' مؤشر/مؤشرات — '+activePlots.length+' سلسلة رسم. المحرك Resin '+outputs[0].version+'.';
-};
+ if(showStatus)$('diagnostics').textContent='نجح تشغيل '+active.length+' مؤشر/مؤشرات — '+activePlots.length+' سلسلة رسم. المحرك Resin '+outputs[0].version+'.';
+ return true;
+}
+$('run').onclick=()=>{executeEnabled(true);draw()};
 function restore(){
  loadSaved();
  if(savedScripts.length){const first=savedScripts[0];$('scriptName').value=first.name;$('source').value=first.source;if(!enabledScripts.length)enabledScripts.push(first.name);refreshSaved()}
