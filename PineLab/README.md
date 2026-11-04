@@ -8,7 +8,10 @@ An independent Android application for running Pine Script against a local synth
 - Synthetic OHLCV data generator with reproducible seed.
 - Arabic interface, chart canvas, symbol/timeframe selectors.
 - Bar replay controls: step, play, reset, and cursor slider.
-- Latest candle is horizontally centered with future blank chart space; chart history spans ten calendar days so 5m and 15m tests cover the same period.
+- Latest candle sits near the right side (about 80% across the plot), leaving future blank space ahead; it is not locked to the center.
+- Touch/mouse drag pans the chart horizontally and vertically; mouse wheel zooms the price scale. Fit resets the view; fullscreen expands the chart.
+- Replay supports selectable speeds (0.25x–10x) and a user-defined replay start point; reset returns to that point.
+- Chart history spans ten calendar days so 5m and 15m tests cover the same period.
 - Saved indicators have independent per-indicator run/stop controls in a dedicated list.
 - Pine editor with local save/restore.
 - Resin 0.3.0 transpiler/runtime bundled into the APK during CI from its upstream TypeScript source.
