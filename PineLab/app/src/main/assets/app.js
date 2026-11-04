@@ -132,5 +132,14 @@ function restore(){
  loadSaved();
  if(savedScripts.length){const first=savedScripts[0];$('scriptName').value=first.name;$('source').value=first.source;if(!enabledScripts.length)enabledScripts.push(first.name);refreshSaved();executeEnabled(false);draw()}
 }
+const chartCanvas=$('chart');
+$('fitChart').onclick=()=>{followLatest=true;viewStart=Math.max(0,cursor-80);priceZoom=1;priceShift=0;draw()};
+$('expandChart').onclick=()=>{const card=chartCanvas.closest('.chartCard');card.classList.toggle('fullscreen');$('expandChart').textContent=card.classList.contains('fullscreen')?'تصغير':'تكبير';setTimeout(draw,80)};
+chartCanvas.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;chartCanvas.setPointerCapture(e.pointerId);chartCanvas.classList.add('dragging');dragState={x:e.clientX,y:e.clientY,start:viewStart===null?Math.max(0,cursor-80):viewStart,shift:priceShift,zoom:priceZoom};followLatest=false});
+chartCanvas.addEventListener('pointermove',e=>{if(!dragState)return;const rect=chartCanvas.getBoundingClientRect(),slots=100,cw=rect.width/slots;viewStart=dragState.start-(e.clientX-dragState.x)/cw;priceShift=dragState.shift+(e.clientY-dragState.y)/(rect.height-36)*priceZoom;draw()});
+function endChartDrag(){dragState=null;chartCanvas.classList.remove('dragging')}
+chartCanvas.addEventListener('pointerup',endChartDrag);chartCanvas.addEventListener('pointercancel',endChartDrag);chartCanvas.addEventListener('lostpointercapture',endChartDrag);
+chartCanvas.addEventListener('wheel',e=>{e.preventDefault();const factor=e.deltaY<0?1.12:0.89;priceZoom=Math.max(.35,Math.min(8,priceZoom*factor));draw()},{passive:false});
+chartCanvas.addEventListener('dblclick',()=>$('fitChart').click());
 window.addEventListener('resize',draw);generate();restore();
 })();
