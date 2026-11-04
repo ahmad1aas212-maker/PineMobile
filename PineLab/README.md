@@ -11,7 +11,9 @@ An independent Android application for running Pine Script against a local synth
 - Pine editor with local save/restore.
 - Resin 0.3.0 transpiler/runtime bundled into the APK during CI from its upstream TypeScript source.
 - Pine execution returns plot series and captured visualization metadata.
-- Initial renderer for plots, shapes, hlines, fills, background/bar colors, and line/box/label objects.
+- Initial renderer for Pine plot styles (line, area, histogram, columns, circles, cross, stepline), shapes/chars/arrows, plotcandle/plotbar, hlines, fills, background/bar colors, and line/box/label objects including line extension and dash styles.
+- `request.security` test feeds for other symbols on higher timeframes (15m through monthly) and deterministic lower-timeframe subdivisions when the requested interval divides the chart interval.
+- Bar Replay re-executes enabled indicators at each selected historical bar.
 - CI smoke test executes a Pine v6 EMA script against 80 synthetic bars, then builds the Android debug APK.
 - Core runtime has no INTERNET permission and no CDN dependency.
 
@@ -26,8 +28,10 @@ Resin 0.3.0 is licensed Apache-2.0. The build checks out its upstream source, bu
 The engine is a Pine v5/v6 compiler/runtime, not TradingView itself. It does not guarantee identical output for every script. Known upstream limitations include:
 - `polyline`, `linefill`, `alert`, and `alertcondition` are no-ops.
 - Resin executes a closed historical dataset; it does not provide tick-by-tick realtime execution.
-- `request.security` for other symbols needs separate OHLCV feeds; the current app only supplies its synthetic chart feed.
-- Some drawing/viz outputs and Pine v5-only semantic differences are not verified against TradingView.
+- `request.security` is supported using synthetic feeds generated from the chart's own OHLCV path; higher-timeframe feeds are aggregated and divisible lower timeframes are subdivided deterministically. These are test data, not real symbol prices, and are not a substitute for real exchange feeds.
+- Resin captures `table.new` handles, but its table cell/set/clear operations are currently no-ops; visible table contents are not implemented.
+- `polyline`, `linefill`, `alert`, and `alertcondition` are no-ops in Resin.
+- Drawing renderer coordinates/styles are initial approximations; some drawing/viz outputs and Pine v5-only semantic differences are not verified against TradingView.
 - The PineLab renderer is still being expanded and must be validated on a physical Android device for coordinate accuracy, scrolling, zooming, and long scripts.
 
 ## Build status
@@ -38,4 +42,4 @@ The CI workflow verifies:
 3. JavaScript syntax,
 4. Android debug APK compilation.
 
-A successful CI build does not replace on-device UI testing or full TradingView parity testing.
+The latest CI run (04-11-2026) passed the TA, visual primitive, multi-symbol `request.security` (1m/60m/daily), table-handle capture, JavaScript syntax, and Android debug APK build checks. A successful CI build does not replace on-device UI testing or full TradingView parity testing.
