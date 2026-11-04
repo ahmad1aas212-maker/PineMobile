@@ -41,9 +41,23 @@ function syntheticFeed(chartBars, symbol, chartTf, targetTf = chartTf) {
     previous = c;
   }
   const sourceTf = tfMinutes(chartTf), destTf = tfMinutes(targetTf);
-  if (destTf <= sourceTf) {
-    return { open, high, low, close, volume, time, timeframe: String(chartTf || "5") };
+  if (destTf < sourceTf && sourceTf % destTf === 0) {
+    const out = { open: [], high: [], low: [], close: [], volume: [], time: [], timeframe: String(targetTf) };
+    const pieces = sourceTf / destTf;
+    for (let i = 0; i < time.length; i++) {
+      const path = i % 2 === 0 ? [open[i], low[i], high[i], close[i]] : [open[i], high[i], low[i], close[i]];
+      for (let j = 0; j < pieces; j++) {
+        const a = j / pieces * 3, b = (j + 1) / pieces * 3;
+        const at = x => { const k = Math.min(2, Math.floor(x)); const f = x - k; return path[k] + (path[k + 1] - path[k]) * f; };
+        const o = at(a), z = at(b), mid1 = at(Math.min(3, a + (b-a)/3)), mid2 = at(Math.min(3, a + 2*(b-a)/3));
+        out.open.push(o); out.close.push(z);
+        out.high.push(Math.max(o,z,mid1,mid2)); out.low.push(Math.min(o,z,mid1,mid2));
+        out.volume.push(volume[i] / pieces); out.time.push(time[i] + j * destTf * 60000);
+      }
+    }
+    return out;
   }
+  if (destTf <= sourceTf) return { open, high, low, close, volume, time, timeframe: String(chartTf || "5") };
   const out = { open: [], high: [], low: [], close: [], volume: [], time: [], timeframe: String(targetTf) };
   let bucket = null;
   for (let i = 0; i < time.length; i++) {
