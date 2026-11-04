@@ -41,13 +41,17 @@ hline(2000, "Reference", color=color.gray)
 plotshape(ta.crossover(fast, slow), title="Cross", style=shape.triangleup, location=location.belowbar, color=color.lime)
 line.new(bar_index[10], low[10], bar_index, low, color=color.red, width=2)
 label.new(bar_index, high, "PineLab")
+plotchar(ta.crossover(fast, slow), title="Char", char="▲", location=location.abovebar)
+plotarrow(close - close[1])
+plotcandle(open, high, low, close, title="Candles")
+plotbar(open, high, low, close, title="Bars")
 `;
 const visual = globalThis.PineLabEngine.execute(visualSource, { open, high, low, close, volume, time }, "5");
 if (!visual.ok) throw new Error("Pine visualization test failed: " + (visual.errors || []).join("; "));
 if (!visual.viz || !visual.viz.shapes || !visual.viz.hlines || !visual.viz.fills || !visual.viz.drawings) {
   throw new Error("Expected captured Pine visualization outputs.");
 }
-if (visual.viz.shapes.length < 1 || visual.viz.hlines.length < 1 || visual.viz.fills.length < 1 || visual.viz.drawings.length < 1) {
+if (visual.viz.shapes.length < 1 || visual.viz.chars.length < 1 || visual.viz.arrows.length < 1 || visual.viz.candles.length < 1 || visual.viz.plotbars.length < 1 || visual.viz.hlines.length < 1 || visual.viz.fills.length < 1 || visual.viz.drawings.length < 1) {
   throw new Error("Pine visualization output collections were unexpectedly empty.");
 }
 const taSource = `//@version=6
