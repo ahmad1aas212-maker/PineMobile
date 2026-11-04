@@ -95,7 +95,7 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
       const key = String(requestedSymbol);
       if (!key) continue;
       for (const tf of timeframes) {
-        if (tfMinutes(tf) < chartMinutes) continue;
+        if (tfMinutes(tf) < chartMinutes && chartMinutes % tfMinutes(tf) !== 0) continue;
         security[key + ":" + tf] = syntheticFeed(bars, key, chartTf, tf);
       }
       security[key] = syntheticFeed(bars, key, chartTf, chartTf);
