@@ -126,4 +126,4 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
     return { ok: false, errors: [String(error && error.message || error)], version: VERSION };
   }
 }
-globalThis.PineLabEngine = { execute, version: VERSION };
+globalThis.PineLabEngine = { execute, version: VERSION, syntheticFeed, toHeikinAshi };
