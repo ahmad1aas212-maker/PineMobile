@@ -10,7 +10,7 @@ function generate(){
  seed=73421;bars=[];let p=$('symbol').value==='XAUUSD'?2350:$('symbol').value==='BTCUSD'?65000:$('symbol').value==='US100'?18000:1.08;
  const step=tfMinutes()*60000;
  for(let i=0;i<300;i++){const o=p,move=(random()-.49)*(p>100?2.2:.008);const c=Math.max(.0001,o+move);const h=Math.max(o,c)+random()*(p>100?1.2:.004);const l=Math.min(o,c)-random()*(p>100?1.2:.004);bars.push({t:BASE+i*step,o,h,l,c,v:100+Math.floor(random()*900)});p=c}
- cursor=bars.length;activePlots=[];activeViz=null;$('replayRange').max=bars.length;$('replayRange').value=cursor;draw();
+ cursor=bars.length;activePlots=[];activeViz=null;$('replayRange').max=bars.length;$('replayRange').value=cursor;executeEnabled(false);draw();
 }
 function draw(){
  const canvas=$('chart'),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
@@ -64,7 +64,7 @@ $('save').onclick=()=>{
  const i=savedScripts.findIndex(s=>s.name===n);
  if(i>=0)savedScripts[i].source=source;else savedScripts.push({name:n,source});
  if(!enabledScripts.includes(n))enabledScripts.push(n);
- persistScripts();refreshSaved();
+ persistScripts();refreshSaved();executeEnabled(false);draw();
  $('diagnostics').textContent='تم حفظ المؤشر وتفعيله: '+n;
 };
 $('loadScript').onclick=()=>{
@@ -77,7 +77,7 @@ $('toggleIndicator').onclick=()=>{
  const n=$('scriptName').value.trim()||'My Indicator';
  if(!savedScripts.some(s=>s.name===n)){$('diagnostics').textContent='احفظ المؤشر أولاً ثم فعّله.';return}
  if(enabledScripts.includes(n))enabledScripts=enabledScripts.filter(x=>x!==n);else enabledScripts.push(n);
- refreshSaved();$('diagnostics').textContent=(enabledScripts.includes(n)?'تم تفعيل ':'تم إيقاف ')+n;
+ persistScripts();refreshSaved();executeEnabled(false);draw();$('diagnostics').textContent=(enabledScripts.includes(n)?'تم تفعيل ':'تم إيقاف ')+n;
 };
 function executeEnabled(showStatus){
  const engine=window.PineLabEngine;
@@ -101,7 +101,7 @@ function executeEnabled(showStatus){
 $('run').onclick=()=>{executeEnabled(true);draw()};
 function restore(){
  loadSaved();
- if(savedScripts.length){const first=savedScripts[0];$('scriptName').value=first.name;$('source').value=first.source;if(!enabledScripts.length)enabledScripts.push(first.name);refreshSaved()}
+ if(savedScripts.length){const first=savedScripts[0];$('scriptName').value=first.name;$('source').value=first.source;if(!enabledScripts.length)enabledScripts.push(first.name);refreshSaved();executeEnabled(false);draw()}
 }
 window.addEventListener('resize',draw);generate();restore();
 })();
