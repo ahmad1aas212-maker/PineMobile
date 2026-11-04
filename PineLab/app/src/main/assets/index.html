@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0d121c"><title>PineLab</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="brand">Pine<span>Lab</span></div><div class="status" id="engineStatus">بيئة الاختبار المحلية</div></header>
+<main>
+<section class="toolbar">
+<select id="symbol"><option>XAUUSD</option><option>EURUSD</option><option>BTCUSD</option><option>US100</option></select>
+<select id="timeframe"><option value="1">1 دقيقة</option><option value="5" selected>5 دقائق</option><option value="15">15 دقيقة</option><option value="60">ساعة</option><option value="240">4 ساعات</option><option value="D">يومي</option></select>
+<button id="regen">توليد بيانات</button>
+</section>
+<section class="chartCard"><div class="chartHead"><b id="chartTitle">XAUUSD · 5m</b><span id="price">—</span></div><canvas id="chart"></canvas><div class="chartFoot"><span id="barsLabel">300 شمعة اصطناعية</span><span id="cursorLabel">آخر شمعة</span></div></section>
+<section class="replay">
+<button id="step">شمعة واحدة ◀</button><button id="play">▶ تشغيل</button><button id="reset">إعادة</button><input id="replayRange" type="range" min="20" max="300" value="300">
+</section>
+<section class="editorCard">
+<div class="editorHead"><b>محرر Pine</b><div><button id="save">حفظ</button><button id="run" class="primary">فحص وتشغيل</button></div></div>
+<input id="scriptName" value="My Indicator" aria-label="اسم المؤشر">
+<textarea id="source" spellcheck="false">//@version=6
+indicator("PineLab Test", overlay=true)
+fast = ta.ema(close, 9)
+slow = ta.ema(close, 21)
+plot(fast, "EMA 9", color=color.orange)
+plot(slow, "EMA 21", color=color.aqua)
+</textarea>
+<div id="diagnostics">المحرّك الكامل قيد الدمج. لا يتم الادعاء بتوافق Pine الكامل في هذه النسخة التأسيسية.</div>
+</section>
+</main>
+<script src="app.js"></script>
+</body></html>
