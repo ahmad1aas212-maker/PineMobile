@@ -1,18 +1,82 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id);
-let bars=[],cursor=300,timer=null,seed=73421,activePlots=[],activeViz=null,savedScripts=[],enabledScripts=[];let executeFrame=0,drawFrame=0,replayPlaying=false;
-let viewStart=null,followLatest=true,priceZoom=1,priceShift=0,replayStart=20,dragState=null,visibleBars=100;const activePointers=new Map();let pinchState=null;
-const DAY=86400000, BASE=Date.UTC(2025,0,1), HISTORY_DAYS=10;
-function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
-function tfMinutes(){const v=$('timeframe').value;return v==='D'?1440:Number(v)}
+let bars=[],cursor=0,timer=null,seed=73421,activePlots=[],activeViz=null,savedScripts=[],enabledScripts=[];let executeFrame=0,drawFrame=0,replayPlaying=false;
+let viewStart=null,followLatest=true,priceZoom=1,priceShift=0,replayStart=0,dragState=null,visibleBars=100;const activePointers=new Map();let pinchState=null;
+let marketRefreshTimer=null,marketLoading=false,marketMeta=null;
 function tfString(){return $('timeframe').value==='D'?'D':$('timeframe').value}
-function generate(){
- stop();seed=73421;bars=[];$('engineStatus').textContent='بيانات اصطناعية للاختبار · دون اتصال';let p=$('symbol').value==='XAUUSD'?2350:$('symbol').value==='BTCUSD'?65000:$('symbol').value==='US100'?18000:1.08;
- const step=tfMinutes()*60000;
- const count=Math.max(300,Math.min(10000,Math.ceil(HISTORY_DAYS*1440/tfMinutes())));
- for(let i=0;i<count;i++){const o=p,move=(random()-.49)*(p>100?2.2:.008);const c=Math.max(.0001,o+move);const h=Math.max(o,c)+random()*(p>100?1.2:.004);const l=Math.min(o,c)-random()*(p>100?1.2:.004);bars.push({t:BASE+i*step,o,h,l,c,v:100+Math.floor(random()*900)});p=c}
- cursor=bars.length;viewStart=Math.max(0,cursor-visibleBars*.8);followLatest=true;priceZoom=1;priceShift=0;replayStart=1;activePlots=[];activeViz=null;$('replayRange').min=replayStart;$('replayRange').max=bars.length;$('replayRange').value=cursor;executeEnabled(false);draw();
+function marketRequest(){
+ const tf=tfString();
+ if(tf==='1')return {interval:'1m',range:'1d'};
+ if(tf==='5')return {interval:'5m',range:'5d'};
+ if(tf==='15')return {interval:'15m',range:'1mo'};
+ if(tf==='30')return {interval:'30m',range:'3mo'};
+ if(tf==='60')return {interval:'60m',range:'1y'};
+ if(tf==='240')return {interval:'60m',range:'2y',aggregate:4};
+ return {interval:'1d',range:'5y'};
+}
+function findOhlcRows(root){
+ const seen=new Set();let best=[];
+ function visit(x,depth){
+  if(!x||typeof x!=='object'||depth>8||seen.has(x))return;seen.add(x);
+  if(Array.isArray(x)){
+   if(x.length&&x.every(v=>v&&typeof v==='object'&&('o'in v||'open'in v)&&('c'in v||'close'in v)&&('t'in v||'time'in v||'timestamp'in v))){if(x.length>best.length)best=x;return}
+   for(const v of x)visit(v,depth+1);return;
+  }
+  if(Array.isArray(x.bars)&&x.bars.length){visit(x.bars,depth+1);return}
+  if(Array.isArray(x.points)&&x.points.length){visit(x.points,depth+1);return}
+  if(Array.isArray(x.data)&&x.data.length){visit(x.data,depth+1);return}
+  if(Array.isArray(x.timestamp)&&x.indicators&&x.indicators.quote){
+   const q=x.indicators.quote[0]||{},a=[];
+   x.timestamp.forEach((t,i)=>a.push({t,o:q.open&&q.open[i],h:q.high&&q.high[i],l:q.low&&q.low[i],c:q.close&&q.close[i],v:q.volume&&q.volume[i]}));if(a.length>best.length)best=a;return;
+  }
+  for(const k of Object.keys(x))visit(x[k],depth+1);
+ }
+ visit(root,0);return best;
+}
+function normalizeMarketRows(rows,aggregate=1){
+ const out=[];
+ for(const r of rows){
+  const rawT=Number(r.t??r.time??r.timestamp??r.bar_start),t=Number.isFinite(rawT)?(rawT>1e12?rawT:rawT*1000):Date.parse(r.t??r.time??r.timestamp??r.bar_start);
+  const o=Number(r.o??r.open),h=Number(r.h??r.high),l=Number(r.l??r.low),c=Number(r.c??r.close),rawV=r.v??r.volume;
+  if(!Number.isFinite(t)||![o,h,l,c].every(Number.isFinite)||h<Math.max(o,c)||l>Math.min(o,c))continue;
+  out.push({t,o,h,l,c,v:Number.isFinite(Number(rawV))?Number(rawV):0});
+ }
+ out.sort((a,b)=>a.t-b.t);
+ const unique=out.filter((b,i)=>!i||b.t!==out[i-1].t);
+ if(aggregate<=1)return unique;
+ const size=aggregate*60*60000,grouped=new Map();
+ for(const b of unique){const key=Math.floor(b.t/size)*size;const g=grouped.get(key);if(!g)grouped.set(key,{t:key,o:b.o,h:b.h,l:b.l,c:b.c,v:b.v});else{g.h=Math.max(g.h,b.h);g.l=Math.min(g.l,b.l);g.c=b.c;g.v+=b.v}}
+ return [...grouped.values()].sort((a,b)=>a.t-b.t);
+}
+function setMarketError(message){
+ $('engineStatus').textContent='تعذّر تحميل بيانات السوق الحقيقية';
+ $('diagnostics').textContent=message;
+ bars=[];cursor=0;activePlots=[];activeViz=null;draw();
+}
+async function generate(){
+ stop();if(marketLoading)return;
+ if($('symbol').value!=='XAUUSD'){setMarketError('مصدر البيانات الحالي يدعم XAUUSD فقط. لم يتم إنشاء شموع وهمية للرموز الأخرى.');return}
+ marketLoading=true;$('regen').disabled=true;$('engineStatus').textContent='جارٍ جلب بيانات الذهب الحقيقية…';
+ try{
+  const req=marketRequest(),url='https://xaus.com/api/v1/chart?symbol=xau&range='+encodeURIComponent(req.range)+'&interval='+encodeURIComponent(req.interval);
+  const response=await fetch(url,{method:'GET',cache:'no-store',headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
+  if(!response.ok)throw new Error('مصدر البيانات أعاد HTTP '+response.status);
+  const payload=await response.json();
+  const raw=findOhlcRows(payload),loaded=normalizeMarketRows(raw,req.aggregate||1);
+  if(!loaded.length)throw new Error('وصل رد من المصدر لكن لم أجد شموع OHLC صالحة. لم يتم عرض بيانات بديلة وهمية.');
+  bars=loaded;cursor=bars.length;viewStart=Math.max(0,cursor-visibleBars*.8);followLatest=true;priceZoom=1;priceShift=0;replayStart=0;activePlots=[];activeViz=null;
+  marketMeta={source:'XAUS chart API (Yahoo Finance proxy)',interval:req.interval,range:req.range,loadedAt:Date.now(),first:bars[0].t,last:bars[bars.length-1].t,state:payload.data_state||payload.meta||null};
+  $('replayRange').min=0;$('replayRange').max=Math.max(1,bars.length-1);$('replayRange').value=cursor-1;
+  $('engineStatus').textContent='XAUUSD حقيقي · '+bars.length+' شمعة · '+req.interval;
+  $('diagnostics').textContent='المصدر: XAUS / Yahoo Finance proxy. أول شمعة: '+new Date(bars[0].t).toISOString()+' — آخر شمعة: '+new Date(bars[bars.length-1].t).toISOString()+'. بيانات الحجم قد لا تكون متاحة لسوق الذهب الفوري.';
+  executeEnabled(false);draw();
+ }catch(error){setMarketError('لم أتمكن من تحميل بيانات XAUUSD الحقيقية: '+String(error&&error.message||error)+'. تحقق من الإنترنت ثم اضغط تحديث. لن أستبدلها ببيانات اصطناعية.')}
+ finally{marketLoading=false;$('regen').disabled=false}
+}
+function scheduleMarketRefresh(){
+ if(marketRefreshTimer)clearInterval(marketRefreshTimer);
+ marketRefreshTimer=setInterval(()=>{if(!marketLoading&&cursor>=bars.length-1)generate()},60000);
 }
 function queueDraw(){if(drawFrame)return;drawFrame=requestAnimationFrame(()=>{drawFrame=0;draw()})}
 function draw(){
@@ -52,7 +116,7 @@ function draw(){
  const dateFmt=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Amman',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
  for(let k=0;k<=4;k++){const xx=w*k/4,idx=Math.max(0,Math.min(cursor-1,Math.round(start+k*visibleBars/4))),label=bars[idx]?dateFmt.format(new Date(bars[idx].t)):'—';c.strokeStyle='#263449';c.beginPath();c.moveTo(xx+.5,0);c.lineTo(xx+.5,h);c.stroke();c.fillStyle='#b7c4d6';c.fillText(label,Math.max(26,Math.min(w-26,xx)),h+14);}
  c.restore();
- const last=visible[visible.length-1];$('price').textContent=last.c.toFixed(last.c>100?2:5);$('chartTitle').textContent=$('symbol').value+' · '+$('timeframe').selectedOptions[0].text;$('barsLabel').textContent='بيانات اصطناعية · '+cursor+' / '+bars.length+' شمعة';$('cursorLabel').textContent=bars[dataEnd-1]?'الوقت '+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Amman',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(bars[dataEnd-1].t)):'—';
+ const last=visible[visible.length-1];$('price').textContent=last.c.toFixed(last.c>100?2:5);$('chartTitle').textContent=$('symbol').value+' · '+$('timeframe').selectedOptions[0].text;$('barsLabel').textContent='XAUUSD حقيقي · '+cursor+' / '+bars.length+' شمعة';$('cursorLabel').textContent=bars[dataEnd-1]?'الوقت '+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Amman',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(bars[dataEnd-1].t)):'—';
 }
 function stop(){replayPlaying=false;if(timer){clearTimeout(timer);timer=null}$('play').textContent='▶ تشغيل'}
 function advance(){if(cursor<bars.length){cursor++;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);executeEnabled(false);draw();return true}stop();return false}
@@ -162,5 +226,5 @@ function releasePointer(e){activePointers.delete(e.pointerId);if(activePointers.
 chartCanvas.addEventListener('pointerup',releasePointer);chartCanvas.addEventListener('pointercancel',releasePointer);chartCanvas.addEventListener('lostpointercapture',releasePointer);
 chartCanvas.addEventListener('wheel',e=>{e.preventDefault();const rect=chartCanvas.getBoundingClientRect(),x=Math.max(0,Math.min(1,(e.clientX-rect.left)/Math.max(1,rect.width-76)));if(e.shiftKey){const old=priceZoom;priceZoom=Math.max(.25,Math.min(12,priceZoom*(e.deltaY<0?1.12:.89)));priceShift+=(priceZoom-old)*(0.5-priceShift);}else{const old=visibleBars;visibleBars=Math.max(8,Math.min(500,visibleBars*(e.deltaY<0?.88:1.136)));viewStart=viewStart+x*old-x*visibleBars;}followLatest=false;draw();},{passive:false});
 chartCanvas.addEventListener('dblclick',()=>$('fitChart').click());
-window.addEventListener('resize',draw);generate();restore();
+window.addEventListener('resize',draw);restore();generate();scheduleMarketRefresh();
 })();
