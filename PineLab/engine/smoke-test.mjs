@@ -73,4 +73,20 @@ for (const plot of taResult.plots) {
     throw new Error("TA output length mismatch for " + plot.title);
   }
 }
-console.log("Resin " + result.version + " passed: EMA, SMA, RSI, MACD, ATR, plot series, shapes, hlines, fills, and drawing capture.");
+
+const securitySource = `//@version=6
+indicator("PineLab security test")
+chartClose = close
+otherClose = request.security("NASDAQ:MSFT", timeframe.period, close)
+plot(chartClose, "Chart feed")
+plot(otherClose, "Synthetic external feed")
+`;
+const securityResult = globalThis.PineLabEngine.execute(securitySource, { open, high, low, close, volume, time }, "5", {}, "XAUUSD");
+if (!securityResult.ok) throw new Error("request.security test failed: " + (securityResult.errors || []).join("; "));
+if (!Array.isArray(securityResult.plots) || securityResult.plots.length !== 2) {
+  throw new Error("Expected chart and security series; got " + (securityResult.plots || []).length);
+}
+if (!securityResult.plots[1].values.some(Number.isFinite)) {
+  throw new Error("Synthetic request.security feed returned no numeric values.");
+}
+console.log("Resin " + result.version + " passed: EMA/SMA/RSI/MACD/ATR, visual primitives, and synthetic request.security feed.");
