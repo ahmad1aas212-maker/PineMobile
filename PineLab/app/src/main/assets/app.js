@@ -63,13 +63,15 @@ async function generate(){
   const response=await fetch(url,{method:'GET',cache:'no-store',headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
   if(!response.ok)throw new Error('مصدر البيانات أعاد HTTP '+response.status);
   const payload=await response.json();
+  const state=payload.data_state||{};
+  if(state.status==='unavailable')throw new Error('المصدر يعلن أن البيانات غير متاحة حالياً.');
   const raw=findOhlcRows(payload),loaded=normalizeMarketRows(raw,req.aggregate||1);
   if(!loaded.length)throw new Error('وصل رد من المصدر لكن لم أجد شموع OHLC صالحة. لم يتم عرض بيانات بديلة وهمية.');
   bars=loaded;cursor=bars.length;viewStart=Math.max(0,cursor-visibleBars*.8);followLatest=true;priceZoom=1;priceShift=0;replayStart=0;activePlots=[];activeViz=null;
-  marketMeta={source:'XAUS chart API (Yahoo Finance proxy)',interval:req.interval,range:req.range,loadedAt:Date.now(),first:bars[0].t,last:bars[bars.length-1].t,state:payload.data_state||payload.meta||null};
-  $('replayRange').min=0;$('replayRange').max=Math.max(1,bars.length-1);$('replayRange').value=cursor-1;
-  $('engineStatus').textContent='XAUUSD حقيقي · '+bars.length+' شمعة · '+req.interval;
-  $('diagnostics').textContent='المصدر: XAUS / Yahoo Finance proxy. أول شمعة: '+new Date(bars[0].t).toISOString()+' — آخر شمعة: '+new Date(bars[bars.length-1].t).toISOString()+'. بيانات الحجم قد لا تكون متاحة لسوق الذهب الفوري.';
+  marketMeta={source:state.source||'XAUS chart API / Yahoo Finance proxy',interval:req.interval,range:req.range,loadedAt:Date.now(),updatedAt:payload.updated_at||state.as_of||null,ageSeconds:state.age_seconds??null,status:state.status||'unknown',first:bars[0].t,last:bars[bars.length-1].t};
+  $('replayRange').min=0;$('replayRange').max=bars.length;$('replayRange').value=cursor;
+  $('engineStatus').textContent='XAUUSD حقيقي · '+bars.length+' شمعة · '+req.interval+(state.status==='stale'?' · متأخر':'');
+  $('diagnostics').textContent='المصدر: '+marketMeta.source+' ('+req.interval+'). حالة المصدر: '+marketMeta.status+'. آخر تحديث للمصدر: '+(marketMeta.updatedAt||'غير معلن')+'. أول شمعة: '+new Date(bars[0].t).toISOString()+' — آخر شمعة: '+new Date(bars[bars.length-1].t).toISOString()+'. '+(marketMeta.ageSeconds!==null?'عمر البيانات بالثواني: '+marketMeta.ageSeconds+'. ':'')+'بيانات الحجم قد لا تمثل تداولاً مركزياً للذهب الفوري.';
   executeEnabled(false);draw();
  }catch(error){setMarketError('لم أتمكن من تحميل بيانات XAUUSD الحقيقية: '+String(error&&error.message||error)+'. تحقق من الإنترنت ثم اضغط تحديث. لن أستبدلها ببيانات اصطناعية.')}
  finally{marketLoading=false;$('regen').disabled=false}
