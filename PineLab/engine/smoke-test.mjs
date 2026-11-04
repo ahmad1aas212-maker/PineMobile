@@ -250,6 +250,32 @@ for (const tf of ["1","15","60","D"]) {
     }
   }
 }
+// Validate actual higher-timeframe OHLC aggregation from the supplied chart feed.
+const aggregateFixture = { open: [], high: [], low: [], close: [], volume: [], time: [] };
+const baseTime = Date.UTC(2026, 0, 5, 0, 0, 0);
+for (let i = 0; i < 13; i++) {
+  const o = 2400 + i, c = o + 0.5;
+  aggregateFixture.open.push(o);
+  aggregateFixture.high.push(o + 1.25);
+  aggregateFixture.low.push(o - 0.75);
+  aggregateFixture.close.push(c);
+  aggregateFixture.volume.push(10 + i);
+  aggregateFixture.time.push(baseTime + i * 5 * 60_000);
+}
+const hourly = globalThis.PineLabEngine.aggregateRealFeed(aggregateFixture, "5", "60");
+if (hourly.close.length !== 2) throw new Error("Expected two real hourly buckets from 13 five-minute bars.");
+if (hourly.open[0] !== 2400 || hourly.close[0] !== 2411.5 || hourly.high[0] !== 2412.25 || hourly.low[0] !== 2399.25) {
+  throw new Error("Hourly OHLC aggregation did not preserve first open, max high, min low and final close.");
+}
+if (hourly.volume[0] !== 10+11+12+13+14+15+16+17+18+19+20+21) {
+  throw new Error("Hourly volume aggregation mismatch.");
+}
+if (hourly.open[1] !== 2412 || hourly.close[1] !== 2412.5 || hourly.volume[1] !== 22) {
+  throw new Error("Partial final higher-timeframe bucket was not preserved correctly.");
+}
+const noLower = globalThis.PineLabEngine.aggregateRealFeed(aggregateFixture, "5", "1");
+if (noLower.close.length !== 0) throw new Error("Lower timeframe aggregation must not fabricate sub-bars.");
+
 const haFeed = globalThis.PineLabEngine.toHeikinAshi(globalThis.PineLabEngine.syntheticFeed(chartFeed,"XAUUSD","5","60"));
 for(let i=0;i<haFeed.close.length;i++){
  if(!(haFeed.high[i]>=Math.max(haFeed.open[i],haFeed.close[i])&&haFeed.low[i]<=Math.min(haFeed.open[i],haFeed.close[i])))throw new Error("Heikin-Ashi OHLC invariant failed at bar "+i);
