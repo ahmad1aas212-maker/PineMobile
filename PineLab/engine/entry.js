@@ -101,7 +101,7 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
       security[key] = syntheticFeed(bars, key, chartTf, chartTf);
     }
     const result = run(compiled, bars, { inputs, security });
-    return { ok: true, version: VERSION, plots: result.plots, viz: result.viz || null, finalVarState: result.finalVarState };
+    return { ok: true, version: VERSION, plots: result.plots, viz: result.viz || null, finalVarState: result.finalVarState, debug: { securitySymbols: compiled.securitySymbols, securityTfs: compiled.securityTfs, suppliedFeeds: Object.keys(security) } };
   } catch (error) {
     return { ok: false, errors: [String(error && error.message || error)], version: VERSION };
   }
