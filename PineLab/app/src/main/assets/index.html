@@ -19,6 +19,7 @@
 <section class="editorCard">
 <div class="editorHead"><b>محرر Pine</b><div><button id="save">حفظ</button><button id="toggleIndicator">تفعيل</button><button id="run" class="primary">تشغيل المفعّل</button></div></div>
 <div class="savedRow"><select id="savedScripts" aria-label="المؤشرات المحفوظة"><option value="">المؤشرات المحفوظة</option></select><button id="loadScript">فتح</button></div>
+<div id="indicatorList" class="indicatorList" aria-label="قائمة تشغيل المؤشرات"></div>
 <input id="scriptName" value="My Indicator" aria-label="اسم المؤشر">
 <textarea id="source" spellcheck="false">//@version=6
 indicator("PineLab Test", overlay=true)
