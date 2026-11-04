@@ -145,8 +145,8 @@ if (!securityResult.ok) throw new Error("request.security test failed: " + (secu
 if (!Array.isArray(securityResult.plots) || securityResult.plots.length !== 2) {
   throw new Error("Expected chart and security series; got " + (securityResult.plots || []).length);
 }
-if (!securityResult.plots[1].values.some(Number.isFinite)) {
-  throw new Error("Synthetic request.security feed returned no numeric values.");
+if (securityResult.plots[1].values.some(Number.isFinite)) {
+  throw new Error("Unsupported external ticker data must not be fabricated.");
 }
 
 const mtfSource = `//@version=6
@@ -172,8 +172,8 @@ if (!mtfResult.ok) throw new Error("Higher timeframe request.security failed: " 
 if (!Array.isArray(mtfResult.plots) || mtfResult.plots.length !== 3) {
   throw new Error("Expected chart, 60m and daily series; got " + (mtfResult.plots || []).length);
 }
-if (!mtfResult.plots[1].values.some(Number.isFinite) || !mtfResult.plots[2].values.some(Number.isFinite)) {
-  throw new Error("Higher timeframe synthetic feeds returned no numeric values.");
+if (mtfResult.plots[1].values.some(Number.isFinite) || mtfResult.plots[2].values.some(Number.isFinite)) {
+  throw new Error("Unsupported external ticker MTF data must not be fabricated.");
 }
 
 
@@ -207,8 +207,8 @@ plot(oneMinute, "1m synthetic")
 `;
 const lowerTfResult = globalThis.PineLabEngine.execute(lowerTfSource, { open, high, low, close, volume, time }, "5", {}, "XAUUSD");
 if (!lowerTfResult.ok) throw new Error("Lower timeframe request.security failed: " + (lowerTfResult.errors || []).join("; "));
-if (!lowerTfResult.plots[0].values.some(Number.isFinite)) {
-  throw new Error("Lower timeframe synthetic feed returned no numeric values.");
+if (lowerTfResult.plots[0].values.some(Number.isFinite)) {
+  throw new Error("Unsupported lower-timeframe data must not be fabricated from interpolated candles.");
 }
 const tableSource = `//@version=6
 indicator("PineLab table test", overlay=true)
@@ -254,4 +254,4 @@ const haFeed = globalThis.PineLabEngine.toHeikinAshi(globalThis.PineLabEngine.sy
 for(let i=0;i<haFeed.close.length;i++){
  if(!(haFeed.high[i]>=Math.max(haFeed.open[i],haFeed.close[i])&&haFeed.low[i]<=Math.min(haFeed.open[i],haFeed.close[i])))throw new Error("Heikin-Ashi OHLC invariant failed at bar "+i);
 }
-console.log("Resin " + result.version + " passed: TA functions, visual primitives, multi-symbol request.security, 1m/60m/D synthetic feeds, Daily Heikin-Ashi previous-day OHLC on 5m, and table handle capture.");
+console.log("Resin " + result.version + " passed: TA functions, visual primitives, request.security no-fabrication guard, same-symbol higher-timeframe aggregation, Daily Heikin-Ashi previous-day OHLC on 5m, and table handle capture.");

@@ -109,11 +109,23 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
     const requested = compiled.securitySymbols || [];
     const chartMinutes = tfMinutes(chartTf);
     const timeframes = ["1","3","5","15","30","45","60","120","240","D","W","M"];
+    const emptyFeed = tf => ({ open: [], high: [], low: [], close: [], volume: [], time: [], timeframe: String(tf) });
     for (const requestedSymbol of requested) {
       const key = String(requestedSymbol);
       if (!key) continue;
+      // Never fabricate another ticker's prices. Only the chart symbol has
+      // an authenticated market feed in this build; unsupported symbols
+      // resolve to empty series so scripts cannot mistake estimates for data.
+      if (key.toUpperCase() !== chartSymbol.toUpperCase()) {
+        for (const tf of timeframes) security[key + ":" + tf] = emptyFeed(tf);
+        security[key] = emptyFeed(chartTf);
+        continue;
+      }
       for (const tf of timeframes) {
-        if (tfMinutes(tf) < chartMinutes && chartMinutes % tfMinutes(tf) !== 0) continue;
+        if (tfMinutes(tf) < chartMinutes) {
+          security[key + ":" + tf] = emptyFeed(tf);
+          continue;
+        }
         const feed = syntheticFeed(bars, key, chartTf, tf);
         security[key + ":" + tf] = wantsHeikinAshi ? toHeikinAshi(feed) : feed;
       }
