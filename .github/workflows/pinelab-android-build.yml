@@ -37,6 +37,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      - name: Patch Resin negative numeric plot metadata
+        run: node PineLab/engine/patch-resin.mjs
       - name: Bundle Resin for offline WebView
         working-directory: PineLab/engine
         run: |
