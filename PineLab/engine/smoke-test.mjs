@@ -109,6 +109,8 @@ if (!Array.isArray(mtfResult.plots) || mtfResult.plots.length !== 3) {
   throw new Error("Expected chart, 60m and daily series; got " + (mtfResult.plots || []).length);
 }
 if (!mtfResult.plots[1].values.some(Number.isFinite) || !mtfResult.plots[2].values.some(Number.isFinite)) {
+  console.log("MTF debug:", JSON.stringify(mtfResult.debug));
+  console.log("MTF samples:", JSON.stringify(mtfResult.plots.map(p => ({title:p.title,first:p.values.slice(0,18),last:p.values.slice(-8)}))));
   throw new Error("Higher timeframe synthetic feeds returned no numeric values.");
 }
 
