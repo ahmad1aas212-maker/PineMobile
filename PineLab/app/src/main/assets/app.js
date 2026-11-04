@@ -87,7 +87,7 @@ function executeEnabled(showStatus){
  const data={open:bars.slice(0,cursor).map(b=>b.o),high:bars.slice(0,cursor).map(b=>b.h),low:bars.slice(0,cursor).map(b=>b.l),close:bars.slice(0,cursor).map(b=>b.c),volume:bars.slice(0,cursor).map(b=>b.v),time:bars.slice(0,cursor).map(b=>b.t)};
  const outputs=[];
  for(const s of active){
-  const out=engine.execute(s.source,data,tfString());
+  const out=engine.execute(s.source,data,tfString(),{},$('symbol').value);
   if(!out.ok){activePlots=[];activeViz=null;if(showStatus)$('diagnostics').textContent='خطأ في '+s.name+':\\n'+(out.errors||['تعذر التشغيل']).join('\\n');return false}
   outputs.push(out);
  }
