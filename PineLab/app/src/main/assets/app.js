@@ -1,14 +1,14 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id);
-let bars=[],cursor=300,timer=null,seed=73421,activePlots=[],activeViz=null,savedScripts=[],enabledScripts=[];let executeFrame=0,drawFrame=0;
+let bars=[],cursor=300,timer=null,seed=73421,activePlots=[],activeViz=null,savedScripts=[],enabledScripts=[];let executeFrame=0,drawFrame=0,replayPlaying=false;
 let viewStart=null,followLatest=true,priceZoom=1,priceShift=0,replayStart=20,dragState=null,visibleBars=100;const activePointers=new Map();let pinchState=null;
 const DAY=86400000, BASE=Date.UTC(2025,0,1), HISTORY_DAYS=10;
 function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
 function tfMinutes(){const v=$('timeframe').value;return v==='D'?1440:Number(v)}
 function tfString(){return $('timeframe').value==='D'?'D':$('timeframe').value}
 function generate(){
- seed=73421;bars=[];$('engineStatus').textContent='بيانات اصطناعية للاختبار · دون اتصال';let p=$('symbol').value==='XAUUSD'?2350:$('symbol').value==='BTCUSD'?65000:$('symbol').value==='US100'?18000:1.08;
+ stop();seed=73421;bars=[];$('engineStatus').textContent='بيانات اصطناعية للاختبار · دون اتصال';let p=$('symbol').value==='XAUUSD'?2350:$('symbol').value==='BTCUSD'?65000:$('symbol').value==='US100'?18000:1.08;
  const step=tfMinutes()*60000;
  const count=Math.max(300,Math.min(10000,Math.ceil(HISTORY_DAYS*1440/tfMinutes())));
  for(let i=0;i<count;i++){const o=p,move=(random()-.49)*(p>100?2.2:.008);const c=Math.max(.0001,o+move);const h=Math.max(o,c)+random()*(p>100?1.2:.004);const l=Math.min(o,c)-random()*(p>100?1.2:.004);bars.push({t:BASE+i*step,o,h,l,c,v:100+Math.floor(random()*900)});p=c}
@@ -47,13 +47,13 @@ function draw(){
  if(activeViz&&activeViz.drawings)activeViz.drawings.forEach(d=>{const s=d.state||{};c.save();if(d.kind==='line'){const x1=xCoord(s.x1),x2=xCoord(s.x2);if(Number.isFinite(x1)&&Number.isFinite(x2)&&Number.isFinite(s.y1)&&Number.isFinite(s.y2)){c.strokeStyle=s.color||'#f4c95d';c.lineWidth=s.width||1.5;c.setLineDash(s.style==='dashed'?[7,5]:s.style==='dotted'?[2,4]:[]);const ext=s.extend||'none',left=ext==='left'||ext==='both',right=ext==='right'||ext==='both';let ax=x1,bx=x2;if(left||right){const dx=x2-x1,dy=y(s.y2)-y(s.y1);if(dx!==0){if(left)ax=0;if(right)bx=w;const yy1=y(s.y1)+(ax-x1)*(dy/dx),yy2=y(s.y1)+(bx-x1)*(dy/dx);c.beginPath();c.moveTo(ax,yy1);c.lineTo(bx,yy2)}else{c.beginPath();c.moveTo(x1,0);c.lineTo(x1,h)}}else{c.beginPath();c.moveTo(x1,y(s.y1));c.lineTo(x2,y(s.y2))}c.stroke();c.setLineDash([])}}else if(d.kind==='box'){const x1=xCoord(s.left),x2=xCoord(s.right);if(Number.isFinite(x1)&&Number.isFinite(x2)&&Number.isFinite(s.top)&&Number.isFinite(s.bottom)){const left=Math.min(x1,x2),top=y(Math.max(s.top,s.bottom)),ww=Math.abs(x2-x1),hh=Math.abs(y(s.top)-y(s.bottom));c.globalAlpha=.14;c.fillStyle=s.bgcolor||'#5c91c9';c.fillRect(left,top,ww,hh);c.globalAlpha=1;c.strokeStyle=s.border_color||'#5c91c9';c.lineWidth=s.border_width||1;c.strokeRect(left,top,ww,hh);if(s.text){c.font='11px Arial';c.fillStyle=s.text_color||'#ffffff';c.fillText(s.text,left+4,top+14)}}}else if(d.kind==='label'){const x=xCoord(s.x);if(Number.isFinite(x)&&Number.isFinite(s.y)){c.font=(s.size==='large'?'16px':s.size==='small'?'10px':'12px')+' Arial';c.fillStyle=s.textcolor||'#ffffff';c.textAlign='left';c.fillText(s.text||'',x,y(s.y))}}c.restore()});
  const last=visible[visible.length-1];$('price').textContent=last.c.toFixed(last.c>100?2:5);$('chartTitle').textContent=$('symbol').value+' · '+$('timeframe').selectedOptions[0].text;$('barsLabel').textContent=cursor+' / '+bars.length+' شمعة';$('cursorLabel').textContent='الشمعة '+cursor;
 }
-function stop(){if(timer){clearTimeout(timer);timer=null}$('play').textContent='▶ تشغيل'}
+function stop(){replayPlaying=false;if(timer){clearTimeout(timer);timer=null}$('play').textContent='▶ تشغيل'}
 function advance(){if(cursor<bars.length){cursor++;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);executeEnabled(false);draw();return true}stop();return false}
-function scheduleReplay(){if(!timer)return;timer=setTimeout(()=>{timer=null;if(advance())scheduleReplay()},Math.max(16,Number($('replaySpeed').value)||500))}
+function scheduleReplay(){if(!replayPlaying)return;timer=setTimeout(()=>{timer=null;if(advance())scheduleReplay()},Math.max(16,Number($('replaySpeed').value)||500))}
 $('regen').onclick=generate;$('symbol').onchange=generate;$('timeframe').onchange=generate;
-$('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop();return}$('play').textContent='إيقاف';scheduleReplay()};
+$('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(replayPlaying){stop();return}replayPlaying=true;$('play').textContent='إيقاف';scheduleReplay()};
 $('reset').onclick=()=>{stop();cursor=replayStart;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);executeEnabled(false);draw()};
-$('replaySpeed').onchange=()=>{if(timer){stop();$('play').textContent='إيقاف';scheduleReplay()}};
+$('replaySpeed').onchange=()=>{if(replayPlaying){if(timer)clearTimeout(timer);timer=null;scheduleReplay()}};
 $('setReplayStart').onclick=()=>{replayStart=cursor;$('replayRange').min=replayStart;$('replayRange').value=cursor;$('diagnostics').textContent='تم تحديد بداية إعادة التشغيل عند الشمعة '+replayStart};
 $('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);queueExecuteAndDraw()};
 function persistScripts(){
