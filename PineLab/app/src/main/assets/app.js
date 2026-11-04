@@ -52,7 +52,8 @@ function refreshSaved(){
  $('toggleIndicator').textContent=enabledScripts.includes($('scriptName').value.trim())?'إيقاف':'تفعيل';
 }
 function loadSaved(){
- try{savedScripts=JSON.parse(localStorage.getItem('pinelab:scripts')||'[]')}catch(e){savedScripts=[]}\n try{enabledScripts=JSON.parse(localStorage.getItem('pinelab:enabled')||'[]')}catch(e){enabledScripts=[]}
+ try{savedScripts=JSON.parse(localStorage.getItem('pinelab:scripts')||'[]')}catch(e){savedScripts=[]}
+ try{enabledScripts=JSON.parse(localStorage.getItem('pinelab:enabled')||'[]')}catch(e){enabledScripts=[]}
  try{const native=window.PineLab?JSON.parse(PineLab.loadScripts()):[];native.forEach(s=>{if(!savedScripts.some(x=>x.name===s.name))savedScripts.push(s)})}catch(e){}
  refreshSaved();
 }
