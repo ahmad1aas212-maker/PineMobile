@@ -40,7 +40,7 @@ $('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop()
 $('reset').onclick=()=>{stop();cursor=20;$('replayRange').value=cursor;draw()};
 $('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);draw()};
 function persistScripts(){
- localStorage.setItem('pinelab:scripts',JSON.stringify(savedScripts));
+ localStorage.setItem('pinelab:scripts',JSON.stringify(savedScripts));\n localStorage.setItem('pinelab:enabled',JSON.stringify(enabledScripts));
  try{if(window.PineLab)savedScripts.forEach(s=>PineLab.saveScript(s.name,s.source))}catch(e){}
 }
 function refreshSaved(){
@@ -51,7 +51,7 @@ function refreshSaved(){
  $('toggleIndicator').textContent=enabledScripts.includes($('scriptName').value.trim())?'إيقاف':'تفعيل';
 }
 function loadSaved(){
- try{savedScripts=JSON.parse(localStorage.getItem('pinelab:scripts')||'[]')}catch(e){savedScripts=[]}
+ try{savedScripts=JSON.parse(localStorage.getItem('pinelab:scripts')||'[]')}catch(e){savedScripts=[]}\n try{enabledScripts=JSON.parse(localStorage.getItem('pinelab:enabled')||'[]')}catch(e){enabledScripts=[]}
  try{const native=window.PineLab?JSON.parse(PineLab.loadScripts()):[];native.forEach(s=>{if(!savedScripts.some(x=>x.name===s.name))savedScripts.push(s)})}catch(e){}
  refreshSaved();
 }
