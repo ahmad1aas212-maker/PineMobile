@@ -8,7 +8,7 @@ function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
 function tfMinutes(){const v=$('timeframe').value;return v==='D'?1440:Number(v)}
 function tfString(){return $('timeframe').value==='D'?'D':$('timeframe').value}
 function generate(){
- seed=73421;bars=[];let p=$('symbol').value==='XAUUSD'?2350:$('symbol').value==='BTCUSD'?65000:$('symbol').value==='US100'?18000:1.08;
+ seed=73421;bars=[];$('engineStatus').textContent='بيانات اصطناعية للاختبار · دون اتصال';let p=$('symbol').value==='XAUUSD'?2350:$('symbol').value==='BTCUSD'?65000:$('symbol').value==='US100'?18000:1.08;
  const step=tfMinutes()*60000;
  const count=Math.max(300,Math.min(10000,Math.ceil(HISTORY_DAYS*1440/tfMinutes())));
  for(let i=0;i<count;i++){const o=p,move=(random()-.49)*(p>100?2.2:.008);const c=Math.max(.0001,o+move);const h=Math.max(o,c)+random()*(p>100?1.2:.004);const l=Math.min(o,c)-random()*(p>100?1.2:.004);bars.push({t:BASE+i*step,o,h,l,c,v:100+Math.floor(random()*900)});p=c}
@@ -23,6 +23,7 @@ function draw(){
  if(viewStart===null)viewStart=Math.max(0,cursor-visibleBars*.8);viewStart=Math.max(0,Math.min(Math.max(0,cursor-1),viewStart));const start=viewStart,dataStart=Math.max(0,Math.floor(start)),dataEnd=Math.min(cursor,Math.ceil(start+visibleBars)),visible=bars.slice(dataStart,dataEnd);if(!visible.length)return;
  let vals=visible.flatMap(b=>[b.l,b.h]);
  for(const p of activePlots)for(let i=dataStart;i<dataEnd;i++){const v=p.values[i];if(Number.isFinite(v))vals.push(v)}
+ if(activeViz){for(const series of [...(activeViz.candles||[]),...(activeViz.plotbars||[])])for(let i=dataStart;i<dataEnd;i++)for(const key of ['open','high','low','close']){const v=series[key]&&series[key][i];if(Number.isFinite(v))vals.push(v)}}
  if(activeViz&&activeViz.hlines)activeViz.hlines.forEach(q=>{if(Number.isFinite(q.price))vals.push(q.price)});
  if(activeViz&&activeViz.drawings)activeViz.drawings.forEach(d=>{const s=d.state||{};['y','y1','y2','top','bottom'].forEach(k=>{if(Number.isFinite(s[k]))vals.push(s[k])})});
  let lo=Math.min(...vals),hi=Math.max(...vals);const pad=(hi-lo)*.08||1;lo-=pad;hi+=pad;
