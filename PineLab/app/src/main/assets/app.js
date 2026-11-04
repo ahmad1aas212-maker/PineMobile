@@ -22,7 +22,7 @@ function draw(){
  c.fillStyle='#101827';c.fillRect(0,0,w,h);
  if(viewStart===null)viewStart=Math.max(0,cursor-visibleBars*.8);viewStart=Math.max(0,Math.min(Math.max(0,cursor-1),viewStart));const start=viewStart,dataStart=Math.max(0,Math.floor(start)),dataEnd=Math.min(cursor,Math.ceil(start+visibleBars)),visible=bars.slice(dataStart,dataEnd);if(!visible.length)return;
  let vals=visible.flatMap(b=>[b.l,b.h]);
- for(let pi=0;pi<activePlots.length;pi++){const p=activePlots[pi],meta=activeViz&&activeViz.plots&&activeViz.plots[pi],off=meta&&Number.isFinite(meta.offset)?meta.offset:0;for(let i=Math.max(0,dataStart-off);i<Math.min(p.values.length,dataEnd-off);i++){const v=p.values[i];if(Number.isFinite(v))vals.push(v)}}
+ for(let pi=0;pi<activePlots.length;pi++){const p=activePlots[pi],meta=activeViz&&activeViz.plots&&activeViz.plots[pi],off=meta&&Number.isFinite(meta.offset)?meta.offset:0;for(let i=Math.max(0,dataStart-off);i<Math.min(p.values.length,dataEnd-off);i++){const v=p.values[i];if(Number.isFinite(v))vals.push(v)}if(meta&&(meta.style==='histogram'||meta.style==='columns'||meta.style==='area')&&Number.isFinite(meta.histbase))vals.push(meta.histbase)}
  if(activeViz){for(const series of [...(activeViz.candles||[]),...(activeViz.plotbars||[])])for(let i=dataStart;i<dataEnd;i++)for(const key of ['open','high','low','close']){const v=series[key]&&series[key][i];if(Number.isFinite(v))vals.push(v)}}
  if(activeViz&&activeViz.hlines)activeViz.hlines.forEach(q=>{if(Number.isFinite(q.price))vals.push(q.price)});
  if(activeViz&&activeViz.drawings)activeViz.drawings.forEach(d=>{const s=d.state||{};['y','y1','y2','top','bottom'].forEach(k=>{if(Number.isFinite(s[k]))vals.push(s[k])})});
