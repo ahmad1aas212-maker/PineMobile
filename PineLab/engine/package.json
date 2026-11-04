@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "description": "Build-time bundling for PineLab's offline Pine runtime",
+  "dependencies": {
+    "@nullarch/resin": "0.3.0",
+    "esbuild": "0.25.12"
+  }
+}
