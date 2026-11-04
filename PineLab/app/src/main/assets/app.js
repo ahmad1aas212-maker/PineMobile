@@ -57,12 +57,27 @@ function persistScripts(){
  try{if(window.PineLab)savedScripts.forEach(s=>PineLab.saveScript(s.name,s.source))}catch(e){}
 }
 function refreshSaved(){
- const select=$('savedScripts'),selected=select.value;
+ const select=$('savedScripts'),selected=select.value,list=$('indicatorList');
  select.innerHTML='<option value="">المؤشرات المحفوظة</option>';
- savedScripts.forEach(s=>{const o=document.createElement('option');o.value=s.name;o.textContent=(enabledScripts.includes(s.name)?'● ':'○ ')+s.name;select.appendChild(o)});
+ list.innerHTML='';
+ savedScripts.forEach(s=>{
+  const enabled=enabledScripts.includes(s.name);
+  const o=document.createElement('option');o.value=s.name;o.textContent=(enabled?'● ':'○ ')+s.name;select.appendChild(o);
+  const row=document.createElement('div');row.className='indicatorItem';
+  const name=document.createElement('span');name.className='indicatorName';name.textContent=s.name;
+  const btn=document.createElement('button');btn.type='button';btn.className=enabled?'enabled':'disabled';btn.textContent=enabled?'إيقاف':'تشغيل';btn.dataset.indicator=s.name;
+  row.append(name,btn);list.appendChild(row);
+ });
  if(savedScripts.some(s=>s.name===selected))select.value=selected;
  $('toggleIndicator').textContent=enabledScripts.includes($('scriptName').value.trim())?'إيقاف':'تفعيل';
 }
+function toggleSavedIndicator(name){
+ if(!savedScripts.some(s=>s.name===name))return;
+ if(enabledScripts.includes(name))enabledScripts=enabledScripts.filter(x=>x!==name);else enabledScripts.push(name);
+ persistScripts();refreshSaved();executeEnabled(false);draw();
+ $('diagnostics').textContent=(enabledScripts.includes(name)?'تم تشغيل ':'تم إيقاف ')+name;
+}
+$('indicatorList').onclick=e=>{const b=e.target.closest('button[data-indicator]');if(b)toggleSavedIndicator(b.dataset.indicator)};
 function loadSaved(){
  try{savedScripts=JSON.parse(localStorage.getItem('pinelab:scripts')||'[]')}catch(e){savedScripts=[]}
  try{enabledScripts=JSON.parse(localStorage.getItem('pinelab:enabled')||'[]')}catch(e){enabledScripts=[]}
@@ -86,8 +101,7 @@ $('loadScript').onclick=()=>{
 $('toggleIndicator').onclick=()=>{
  const n=$('scriptName').value.trim()||'My Indicator';
  if(!savedScripts.some(s=>s.name===n)){$('diagnostics').textContent='احفظ المؤشر أولاً ثم فعّله.';return}
- if(enabledScripts.includes(n))enabledScripts=enabledScripts.filter(x=>x!==n);else enabledScripts.push(n);
- persistScripts();refreshSaved();executeEnabled(false);draw();$('diagnostics').textContent=(enabledScripts.includes(n)?'تم تفعيل ':'تم إيقاف ')+n;
+ toggleSavedIndicator(n);
 };
 function executeEnabled(showStatus){
  const engine=window.PineLabEngine;
