@@ -107,6 +107,17 @@ if (!Array.isArray(mtfResult.plots) || mtfResult.plots.length !== 3) {
 if (!mtfResult.plots[1].values.some(Number.isFinite) || !mtfResult.plots[2].values.some(Number.isFinite)) {
   throw new Error("Higher timeframe synthetic feeds returned no numeric values.");
 }
+
+const lowerTfSource = `//@version=6
+indicator("PineLab lower timeframe test")
+oneMinute = request.security("NASDAQ:MSFT", "1", close)
+plot(oneMinute, "1m synthetic")
+`;
+const lowerTfResult = globalThis.PineLabEngine.execute(lowerTfSource, { open, high, low, close, volume, time }, "5", {}, "XAUUSD");
+if (!lowerTfResult.ok) throw new Error("Lower timeframe request.security failed: " + (lowerTfResult.errors || []).join("; "));
+if (!lowerTfResult.plots[0].values.some(Number.isFinite)) {
+  throw new Error("Lower timeframe synthetic feed returned no numeric values.");
+}
 const tableSource = `//@version=6
 indicator("PineLab table test", overlay=true)
 var t = table.new(position.top_right, 2, 2)
@@ -119,5 +130,6 @@ if barstate.islast
 const tableResult = globalThis.PineLabEngine.execute(tableSource, { open, high, low, close, volume, time }, "5");
 if (!tableResult.ok) throw new Error("Table capture test failed: " + (tableResult.errors || []).join("; "));
 if (!tableResult.viz) throw new Error("Expected table visualization metadata.");
+if (!tableResult.viz.drawings.some(d => d.kind === "table")) throw new Error("Expected a captured table handle.");
 console.log("Table viz probe: " + JSON.stringify(tableResult.viz).slice(0, 2500));
-console.log("Resin " + result.version + " passed: EMA/SMA/RSI/MACD/ATR, visual primitives, multi-symbol request.security, and 60m/D synthetic feeds.");
+console.log("Resin " + result.version + " passed: TA functions, visual primitives, multi-symbol request.security, 1m/60m/D synthetic feeds, and table handle capture.");
