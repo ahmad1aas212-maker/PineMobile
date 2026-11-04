@@ -40,7 +40,8 @@ $('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop()
 $('reset').onclick=()=>{stop();cursor=20;$('replayRange').value=cursor;draw()};
 $('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);draw()};
 function persistScripts(){
- localStorage.setItem('pinelab:scripts',JSON.stringify(savedScripts));\n localStorage.setItem('pinelab:enabled',JSON.stringify(enabledScripts));
+ localStorage.setItem('pinelab:scripts',JSON.stringify(savedScripts));
+ localStorage.setItem('pinelab:enabled',JSON.stringify(enabledScripts));
  try{if(window.PineLab)savedScripts.forEach(s=>PineLab.saveScript(s.name,s.source))}catch(e){}
 }
 function refreshSaved(){
