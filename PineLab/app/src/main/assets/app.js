@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id);
-let bars=[],cursor=300,timer=null,seed=73421,activePlots=[],activeViz=null,savedScripts=[],enabledScripts=[];
+let bars=[],cursor=300,timer=null,seed=73421,activePlots=[],activeViz=null,savedScripts=[],enabledScripts=[];let executeFrame=0;
 let viewStart=null,followLatest=true,priceZoom=1,priceShift=0,replayStart=20,dragState=null,visibleBars=100;const activePointers=new Map();let pinchState=null;
 const DAY=86400000, BASE=Date.UTC(2025,0,1), HISTORY_DAYS=10;
 function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
@@ -53,7 +53,7 @@ $('step').onclick=()=>{stop();advance()};$('play').onclick=()=>{if(timer){stop()
 $('reset').onclick=()=>{stop();cursor=replayStart;$('replayRange').value=cursor;if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);executeEnabled(false);draw()};
 $('replaySpeed').onchange=()=>{if(timer){stop();$('play').textContent='إيقاف';scheduleReplay()}};
 $('setReplayStart').onclick=()=>{replayStart=cursor;$('replayRange').min=replayStart;$('replayRange').value=cursor;$('diagnostics').textContent='تم تحديد بداية إعادة التشغيل عند الشمعة '+replayStart};
-$('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);executeEnabled(false);draw()};
+$('replayRange').oninput=e=>{stop();cursor=Number(e.target.value);if(followLatest)viewStart=Math.max(0,cursor-visibleBars*.8);queueExecuteAndDraw()};
 function persistScripts(){
  localStorage.setItem('pinelab:scripts',JSON.stringify(savedScripts));
  localStorage.setItem('pinelab:enabled',JSON.stringify(enabledScripts));
@@ -106,6 +106,7 @@ $('toggleIndicator').onclick=()=>{
  if(!savedScripts.some(s=>s.name===n)){$('diagnostics').textContent='احفظ المؤشر أولاً ثم فعّله.';return}
  toggleSavedIndicator(n);
 };
+function queueExecuteAndDraw(){if(executeFrame)return;executeFrame=requestAnimationFrame(()=>{executeFrame=0;executeEnabled(false);draw()})}
 function executeEnabled(showStatus){
  const engine=window.PineLabEngine;
  if(!engine){if(showStatus)$('diagnostics').textContent='محرك Pine غير موجود في هذه النسخة.';return false}
