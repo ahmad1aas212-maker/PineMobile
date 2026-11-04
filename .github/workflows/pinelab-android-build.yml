@@ -39,6 +39,8 @@ jobs:
           npm install --no-audit --no-fund
           ./node_modules/.bin/esbuild entry.js --bundle --format=iife --platform=browser --target=es2020 --outfile=../app/src/main/assets/resin-engine.js
           cp vendor/resin/LICENSE ../app/src/main/assets/RESIN-LICENSE.txt
+      - name: Check Android chart UI JavaScript
+        run: node --check PineLab/app/src/main/assets/app.js
       - name: Test Pine engine on synthetic bars
         working-directory: PineLab
         run: node engine/smoke-test.mjs
