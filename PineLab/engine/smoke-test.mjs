@@ -1,4 +1,5 @@
 import "../app/src/main/assets/resin-engine.js";
+import "../app/src/main/assets/visual-merge.js";
 
 const n = 80;
 const open = [], high = [], low = [], close = [], volume = [], time = [];
@@ -13,6 +14,43 @@ for (let i = 0; i < n; i++) {
   time.push(Date.UTC(2025, 0, 1) + i * 5 * 60_000);
   p = c;
 }
+
+const mergeProbe = globalThis.PineLabVisualMerge([
+  {
+    plots: [{title:"A0"}, {title:"A1"}],
+    viz: {
+      plots: [{title:"A0"}, {title:"A1"}],
+      hlines: [{price:10}],
+      fills: [{a:{kind:"plot",index:0}, b:{kind:"plot",index:1}, color:"#111"}]
+    }
+  },
+  {
+    plots: [{title:"B0"}, {title:"B1"}],
+    viz: {
+      plots: [{title:"B0"}, {title:"B1"}],
+      hlines: [{price:20}],
+      fills: [
+        {a:{kind:"plot",index:0}, b:{kind:"plot",index:1}, color:"#222"},
+        {a:{kind:"hline",index:0}, b:{kind:"plot",index:1}, color:"#333"}
+      ]
+    }
+  }
+]);
+if (mergeProbe.plots.length !== 4 || mergeProbe.viz.plots.length !== 4) {
+  throw new Error("Multi-indicator merge lost plot series or metadata.");
+}
+const secondIndicatorFill = mergeProbe.viz.fills[1];
+if (secondIndicatorFill.a.index !== 2 || secondIndicatorFill.b.index !== 3) {
+  throw new Error("Second indicator plot fill references were not offset correctly.");
+}
+const secondIndicatorHlineFill = mergeProbe.viz.fills[2];
+if (secondIndicatorHlineFill.a.index !== 1 || secondIndicatorHlineFill.b.index !== 3) {
+  throw new Error("Second indicator hline/plot fill references were not offset correctly.");
+}
+if (mergeProbe.viz.fills[1].a.index !== 2) {
+  throw new Error("Merged fill references were unexpectedly mutated.");
+}
+
 const source = `//@version=6
 indicator("PineLab smoke test", overlay=true)
 fast = ta.ema(close, 9)

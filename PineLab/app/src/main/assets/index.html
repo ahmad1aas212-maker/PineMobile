@@ -12,9 +12,9 @@
 <select id="timeframe"><option value="1">1 دقيقة</option><option value="5" selected>5 دقائق</option><option value="15">15 دقيقة</option><option value="60">ساعة</option><option value="240">4 ساعات</option><option value="D">يومي</option></select>
 <button id="regen">تحديث السوق</button>
 </section>
-<section class="chartCard"><div class="chartHead"><b id="chartTitle">XAUUSD · 5m</b><span id="price">—</span><div class="chartTools"><button id="fitChart" type="button">ملاءمة</button><button id="expandChart" type="button">تكبير</button></div></div><canvas id="chart"></canvas><div class="chartFoot"><span id="barsLabel">300 شمعة اصطناعية</span><span id="cursorLabel">آخر شمعة</span></div></section>
+<section class="chartCard"><div class="chartHead"><b id="chartTitle">XAUUSD · 5m</b><span id="price">—</span><div class="chartTools"><button id="fitChart" type="button">ملاءمة</button><button id="expandChart" type="button">تكبير</button></div></div><canvas id="chart"></canvas><div class="chartFoot"><span id="barsLabel">بانتظار بيانات السوق الحقيقية</span><span id="cursorLabel">آخر شمعة</span></div></section>
 <section class="replay">
-<button id="step">شمعة ◀</button><button id="play">▶ تشغيل</button><button id="reset">إعادة</button><button id="setReplayStart">تحديد البداية</button><select id="replaySpeed" aria-label="سرعة إعادة التشغيل"><option value="2000">0.25×</option><option value="1000">0.5×</option><option value="500" selected>1×</option><option value="250">2×</option><option value="100">5×</option><option value="50">10×</option></select><input id="replayRange" type="range" min="20" max="300" value="300">
+<button id="step">شمعة ◀</button><button id="play">▶ تشغيل</button><button id="reset">إعادة</button><button id="setReplayStart">تحديد البداية</button><select id="replaySpeed" aria-label="سرعة إعادة التشغيل"><option value="2000">0.25×</option><option value="1000">0.5×</option><option value="500" selected>1×</option><option value="250">2×</option><option value="100">5×</option><option value="50">10×</option></select><input id="replayRange" type="range" min="0" max="0" value="0">
 </section>
 <section class="editorCard">
 <div class="editorHead"><b>محرر Pine</b><div><button id="save">حفظ</button><button id="toggleIndicator">تفعيل</button><button id="run" class="primary">تشغيل المفعّل</button></div></div>
@@ -32,5 +32,6 @@ plot(slow, "EMA 21", color=color.aqua)
 </section>
 </main>
 <script src="resin-engine.js"></script>
+<script src="visual-merge.js"></script>
 <script src="app.js"></script>
 </body></html>

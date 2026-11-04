@@ -52,7 +52,7 @@ function normalizeMarketRows(rows,aggregate=1){
 function setMarketError(message){
  $('engineStatus').textContent='تعذّر تحميل بيانات السوق الحقيقية';
  $('diagnostics').textContent=message;
- bars=[];cursor=0;activePlots=[];activeViz=null;draw();
+ bars=[];cursor=0;replayStart=0;$('replayRange').min=0;$('replayRange').max=0;$('replayRange').value=0;activePlots=[];activeViz=null;draw();
 }
 async function generate(){
  stop();if(marketLoading)return;
@@ -195,10 +195,9 @@ function executeEnabled(showStatus){
   outputs.push(out);
  }
  if(!outputs.length){activePlots=[];activeViz=null;if(showStatus)$('diagnostics').textContent='فشل تشغيل المؤشرات المفعّلة: '+failures.join(' | ');return false}
- activePlots=outputs.flatMap(o=>o.plots||[]);
- const keys=['shapes','chars','arrows','candles','plotbars','hlines','fills','drawings','bgcolors','barcolors','plots'];
- activeViz={};
- keys.forEach(k=>activeViz[k]=outputs.flatMap(o=>o.viz&&o.viz[k]?(Array.isArray(o.viz[k])?o.viz[k]:[o.viz[k]]):[]));
+ const merged=PineLabVisualMerge(outputs);
+ activePlots=merged.plots;
+ activeViz=merged.viz;
  if(showStatus)$('diagnostics').textContent='نجح '+outputs.length+' من '+active.length+' مؤشر — '+activePlots.length+' سلسلة رسم. المحرك Resin '+outputs[0].version+'.'+(failures.length?' أخطاء: '+failures.join(' | '):'');
  return true;
 }
