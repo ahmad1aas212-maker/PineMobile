@@ -169,4 +169,34 @@ if (!tableResult.ok) throw new Error("Table capture test failed: " + (tableResul
 if (!tableResult.viz) throw new Error("Expected table visualization metadata.");
 if (!tableResult.viz.drawings.some(d => d.kind === "table")) throw new Error("Expected a captured table handle.");
 console.log("Table viz probe: " + JSON.stringify(tableResult.viz).slice(0, 2500));
+
+const fullReplay = globalThis.PineLabEngine.execute(source, { open, high, low, close, volume, time }, "5");
+const prefixLength = 37;
+const prefixBars = Object.fromEntries(["open","high","low","close","volume","time"].map(k => [k, ({open,high,low,close,volume,time})[k].slice(0,prefixLength)]));
+const prefixReplay = globalThis.PineLabEngine.execute(source, prefixBars, "5");
+if (!fullReplay.ok || !prefixReplay.ok) throw new Error("Replay causality fixture failed to execute.");
+for (let p = 0; p < fullReplay.plots.length; p++) {
+  for (let i = 0; i < prefixLength; i++) {
+    const a = fullReplay.plots[p].values[i], b = prefixReplay.plots[p].values[i];
+    if (Number.isFinite(a) !== Number.isFinite(b) || (Number.isFinite(a) && Math.abs(a-b) > 1e-9)) {
+      throw new Error("Replay prefix mismatch at plot " + p + ", bar " + i + ": future bars changed a historical value.");
+    }
+  }
+}
+const chartFeed = {open,high,low,close,volume,time};
+for (const tf of ["1","15","60","D"]) {
+  const feed = globalThis.PineLabEngine.syntheticFeed(chartFeed, "XAUUSD", "5", tf);
+  if (!feed.close.length || feed.time.some((v,i)=>i>0&&v<=feed.time[i-1])) {
+    throw new Error("Synthetic " + tf + " feed is empty or has non-monotonic timestamps.");
+  }
+  for (let i=0;i<feed.close.length;i++) {
+    if (!(feed.high[i] >= Math.max(feed.open[i],feed.close[i]) && feed.low[i] <= Math.min(feed.open[i],feed.close[i]))) {
+      throw new Error("Synthetic " + tf + " OHLC invariant failed at bar " + i);
+    }
+  }
+}
+const haFeed = globalThis.PineLabEngine.toHeikinAshi(globalThis.PineLabEngine.syntheticFeed(chartFeed,"XAUUSD","5","60"));
+for(let i=0;i<haFeed.close.length;i++){
+ if(!(haFeed.high[i]>=Math.max(haFeed.open[i],haFeed.close[i])&&haFeed.low[i]<=Math.min(haFeed.open[i],haFeed.close[i])))throw new Error("Heikin-Ashi OHLC invariant failed at bar "+i);
+}
 console.log("Resin " + result.version + " passed: TA functions, visual primitives, multi-symbol request.security, 1m/60m/D synthetic feeds, Daily Heikin-Ashi previous-day OHLC on 5m, and table handle capture.");
