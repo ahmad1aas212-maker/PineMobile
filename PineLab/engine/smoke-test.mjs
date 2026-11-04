@@ -223,6 +223,15 @@ const tableResult = globalThis.PineLabEngine.execute(tableSource, { open, high, 
 if (!tableResult.ok) throw new Error("Table capture test failed: " + (tableResult.errors || []).join("; "));
 if (!tableResult.viz) throw new Error("Expected table visualization metadata.");
 if (!tableResult.viz.drawings.some(d => d.kind === "table")) throw new Error("Expected a captured table handle.");
+const capturedTable = tableResult.viz.drawings.find(d => d.kind === "table");
+if (!capturedTable.state || capturedTable.state.columns !== 2 || capturedTable.state.rows !== 2) {
+  throw new Error("Table dimensions or position metadata were not retained.");
+}
+if (Array.isArray(capturedTable.state.cells) && capturedTable.state.cells.length) {
+  console.log("Table cell payload is available from Resin.");
+} else {
+  console.log("Table cell payload is not exposed by Resin 0.3.0; PineLab will show an explicit placeholder instead of a misleading blank table.");
+}
 console.log("Table viz probe: " + JSON.stringify(tableResult.viz).slice(0, 2500));
 
 const fullReplay = globalThis.PineLabEngine.execute(source, { open, high, low, close, volume, time }, "5");
