@@ -26,7 +26,7 @@ function draw(){
  if(activeViz){for(const series of [...(activeViz.candles||[]),...(activeViz.plotbars||[])])for(let i=dataStart;i<dataEnd;i++)for(const key of ['open','high','low','close']){const v=series[key]&&series[key][i];if(Number.isFinite(v))vals.push(v)}}
  if(activeViz&&activeViz.hlines)activeViz.hlines.forEach(q=>{if(Number.isFinite(q.price))vals.push(q.price)});
  if(activeViz&&activeViz.drawings)activeViz.drawings.forEach(d=>{const s=d.state||{};['y','y1','y2','top','bottom'].forEach(k=>{if(Number.isFinite(s[k]))vals.push(s[k])})});
- let lo=Math.min(...vals),hi=Math.max(...vals);const pad=(hi-lo)*.08||1;lo-=pad;hi+=pad;
+ let lo=Infinity,hi=-Infinity;for(let i=0;i<vals.length;i++){const v=vals[i];if(!Number.isFinite(v))continue;if(v<lo)lo=v;if(v>hi)hi=v}if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=0;hi=1}const pad=(hi-lo)*.08||Math.max(Math.abs(hi)*.0005,1);lo-=pad;hi+=pad;
  const y=v=>h-18-(((v-lo)/(hi-lo)-0.5)*priceZoom+0.5+priceShift)*(h-36),cw=w/visibleBars;
  c.strokeStyle='#263449';c.lineWidth=1;for(let i=1;i<5;i++){let yy=h*i/5;c.beginPath();c.moveTo(0,yy);c.lineTo(w,yy);c.stroke()}
  if(activeViz&&activeViz.bgcolors)activeViz.bgcolors.forEach(bg=>{for(let i=dataStart;i<dataEnd;i++){const col=(bg.colors&&bg.colors[i])||bg.color;if(!col)continue;c.globalAlpha=.12;c.fillStyle=col;c.fillRect((i-start)*cw,0,cw,h)}c.globalAlpha=1});
@@ -114,7 +114,7 @@ function executeEnabled(showStatus){
  if(!engine){if(showStatus)$('diagnostics').textContent='محرك Pine غير موجود في هذه النسخة.';return false}
  const active=savedScripts.filter(s=>enabledScripts.includes(s.name));
  if(!active.length){activePlots=[];activeViz=null;if(showStatus)$('diagnostics').textContent='لا توجد مؤشرات مفعّلة.';return false}
- const data={open:bars.slice(0,cursor).map(b=>b.o),high:bars.slice(0,cursor).map(b=>b.h),low:bars.slice(0,cursor).map(b=>b.l),close:bars.slice(0,cursor).map(b=>b.c),volume:bars.slice(0,cursor).map(b=>b.v),time:bars.slice(0,cursor).map(b=>b.t)};
+ const visibleBarsData=bars.slice(0,cursor);const data={open:visibleBarsData.map(b=>b.o),high:visibleBarsData.map(b=>b.h),low:visibleBarsData.map(b=>b.l),close:visibleBarsData.map(b=>b.c),volume:visibleBarsData.map(b=>b.v),time:visibleBarsData.map(b=>b.t)};
  const outputs=[],failures=[];
  for(const s of active){
   const out=engine.execute(s.source,data,tfString(),{},$('symbol').value);
