@@ -1,6 +1,15 @@
 import { transpile, run, VERSION } from "./vendor/resin/src/index.ts";
 
-function syntheticFeed(chartBars, symbol, chartTf) {
+function tfMinutes(tf) {
+  const s = String(tf || "5").toUpperCase();
+  if (s === "D" || s === "1D") return 1440;
+  if (s === "W" || s === "1W") return 10080;
+  if (s === "M" || s === "1M") return 43200;
+  const n = Number.parseInt(s, 10);
+  return Number.isFinite(n) && n > 0 ? n : 5;
+}
+
+function syntheticFeed(chartBars, symbol, chartTf, targetTf = chartTf) {
   const name = String(symbol || "SYNTH").toUpperCase();
   const first = chartBars.close[0] || 1;
   const target = name.includes("XAU") ? 2350 :
@@ -14,7 +23,7 @@ function syntheticFeed(chartBars, symbol, chartTf) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   const drift = ((hash % 17) - 8) * 0.000004;
-  const open = [], high = [], low = [], close = [], volume = [], time = chartBars.time;
+  const open = [], high = [], low = [], close = [], volume = [], time = [];
   let previous = target;
   for (let i = 0; i < chartBars.close.length; i++) {
     const baseOpen = chartBars.open[i] || chartBars.close[i];
@@ -28,9 +37,29 @@ function syntheticFeed(chartBars, symbol, chartTf) {
     high.push(Math.max(o, c) + spread * 0.5);
     low.push(Math.min(o, c) - spread * 0.5);
     volume.push(chartBars.volume ? chartBars.volume[i] || 0 : 0);
+    time.push(chartBars.time[i]);
     previous = c;
   }
-  return { open, high, low, close, volume, time, timeframe: String(chartTf || "5") };
+  const sourceTf = tfMinutes(chartTf), destTf = tfMinutes(targetTf);
+  if (destTf <= sourceTf) {
+    return { open, high, low, close, volume, time, timeframe: String(chartTf || "5") };
+  }
+  const out = { open: [], high: [], low: [], close: [], volume: [], time: [], timeframe: String(targetTf) };
+  let bucket = null;
+  for (let i = 0; i < time.length; i++) {
+    const key = Math.floor(time[i] / (destTf * 60000));
+    if (key !== bucket) {
+      bucket = key;
+      out.open.push(open[i]); out.high.push(high[i]); out.low.push(low[i]);
+      out.close.push(close[i]); out.volume.push(volume[i]); out.time.push(time[i]);
+    } else {
+      const j = out.close.length - 1;
+      out.high[j] = Math.max(out.high[j], high[i]);
+      out.low[j] = Math.min(out.low[j], low[i]);
+      out.close[j] = close[i]; out.volume[j] += volume[i];
+    }
+  }
+  return out;
 }
 
 function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
@@ -46,11 +75,16 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
     if (!compiled.ok) return { ok: false, errors: compiled.errors, version: VERSION };
     const security = {};
     const requested = compiled.securitySymbols || [];
+    const chartMinutes = tfMinutes(chartTf);
+    const timeframes = ["1","3","5","15","30","45","60","120","240","D","W","M"];
     for (const requestedSymbol of requested) {
       const key = String(requestedSymbol);
-      if (key && key.toUpperCase() !== String(symbol).toUpperCase()) {
-        security[key] = syntheticFeed(bars, key, chartTf);
+      if (!key) continue;
+      for (const tf of timeframes) {
+        if (tfMinutes(tf) < chartMinutes) continue;
+        security[key + ":" + tf] = syntheticFeed(bars, key, chartTf, tf);
       }
+      security[key] = syntheticFeed(bars, key, chartTf, chartTf);
     }
     const result = run(compiled, bars, { inputs, security });
     return { ok: true, version: VERSION, plots: result.plots, viz: result.viz || null, finalVarState: result.finalVarState };
