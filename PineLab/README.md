@@ -8,11 +8,14 @@ An independent Android application for running Pine Script against a local synth
 - Synthetic OHLCV data generator with reproducible seed.
 - Arabic interface, chart canvas, symbol/timeframe selectors.
 - Bar replay controls: step, play, reset, and cursor slider.
+- Latest candle is horizontally centered with future blank chart space; chart history spans ten calendar days so 5m and 15m tests cover the same period.
+- Saved indicators have independent per-indicator run/stop controls in a dedicated list.
 - Pine editor with local save/restore.
 - Resin 0.3.0 transpiler/runtime bundled into the APK during CI from its upstream TypeScript source.
 - Pine execution returns plot series and captured visualization metadata.
 - Initial renderer for Pine plot styles (line, area, histogram, columns, circles, cross, stepline), shapes/chars/arrows, plotcandle/plotbar, hlines, fills, background/bar colors, and line/box/label objects including line extension and dash styles.
 - `request.security` test feeds for other symbols on higher timeframes (15m through monthly) and deterministic lower-timeframe subdivisions when the requested interval divides the chart interval.
+- `ticker.heikinashi` requests receive Heikin-Ashi transformed synthetic OHLC feeds; regression test covers the previous completed daily HA OHLC pattern on a 5m chart.
 - Bar Replay re-executes enabled indicators at each selected historical bar.
 - CI smoke test executes a Pine v6 EMA script against 80 synthetic bars, then builds the Android debug APK.
 - Core runtime has no INTERNET permission and no CDN dependency.
