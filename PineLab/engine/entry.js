@@ -76,6 +76,19 @@ function syntheticFeed(chartBars, symbol, chartTf, targetTf = chartTf) {
   return out;
 }
 
+function toHeikinAshi(feed) {
+  const out = { open: [], high: [], low: [], close: [], volume: Array.from(feed.volume), time: Array.from(feed.time), timeframe: feed.timeframe };
+  for (let i = 0; i < feed.close.length; i++) {
+    const haClose = (feed.open[i] + feed.high[i] + feed.low[i] + feed.close[i]) / 4;
+    const haOpen = i === 0 ? (feed.open[i] + feed.close[i]) / 2 : (out.open[i - 1] + out.close[i - 1]) / 2;
+    out.open.push(haOpen);
+    out.close.push(haClose);
+    out.high.push(Math.max(feed.high[i], haOpen, haClose));
+    out.low.push(Math.min(feed.low[i], haOpen, haClose));
+  }
+  return out;
+}
+
 function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
   try {
     const compiled = transpile(source, {
@@ -87,6 +100,11 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
       }
     });
     if (!compiled.ok) return { ok: false, errors: compiled.errors, version: VERSION };
+    const wantsHeikinAshi = /ticker\s*\.\s*heikinashi\s*\(/.test(source);
+    const chartSymbol = String(symbol || "SYNTH");
+    if (wantsHeikinAshi) {
+      compiled.securitySymbols = (compiled.securitySymbols || []).map(s => s == null ? chartSymbol : s);
+    }
     const security = {};
     const requested = compiled.securitySymbols || [];
     const chartMinutes = tfMinutes(chartTf);
@@ -96,9 +114,11 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
       if (!key) continue;
       for (const tf of timeframes) {
         if (tfMinutes(tf) < chartMinutes && chartMinutes % tfMinutes(tf) !== 0) continue;
-        security[key + ":" + tf] = syntheticFeed(bars, key, chartTf, tf);
+        const feed = syntheticFeed(bars, key, chartTf, tf);
+        security[key + ":" + tf] = wantsHeikinAshi ? toHeikinAshi(feed) : feed;
       }
-      security[key] = syntheticFeed(bars, key, chartTf, chartTf);
+      const feed = syntheticFeed(bars, key, chartTf, chartTf);
+      security[key] = wantsHeikinAshi ? toHeikinAshi(feed) : feed;
     }
     const result = run(compiled, bars, { inputs, security });
     return { ok: true, version: VERSION, plots: result.plots, viz: result.viz || null, finalVarState: result.finalVarState };
