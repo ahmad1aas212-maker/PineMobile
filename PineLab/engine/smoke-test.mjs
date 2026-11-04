@@ -59,12 +59,16 @@ indicator("PineLab plot offset test", overlay=true)
 plot(close, "Shifted right", offset=3)
 plot(close, "Shifted left", offset=-2)
 `;
-const offsetResult = globalThis.PineLabEngine.execute(offsetSource, { open, high, low, close, volume, time }, "5");
-if (!offsetResult.ok || !offsetResult.viz || offsetResult.viz.plots.length !== 2) {
-  throw new Error("Plot offset fixture failed to execute.");
+const offsetCompiled = globalThis.PineLabEngine.transpile(offsetSource, { chartTf: "5", syminfo: { ticker: "XAUUSD" } });
+if (!offsetCompiled.ok || offsetCompiled.viz.plots.length !== 2) {
+  throw new Error("Plot offset fixture failed to compile.");
 }
-if (offsetResult.viz.plots[0].offset !== 3 || offsetResult.viz.plots[1].offset !== -2) {
-  throw new Error("Plot offsets were not preserved in visualization metadata.");
+if (offsetCompiled.viz.plots[0].offset !== 3 || offsetCompiled.viz.plots[1].offset !== -2) {
+  throw new Error("Plot offsets were not preserved in compiler metadata: " + JSON.stringify(offsetCompiled.viz.plots));
+}
+const offsetResult = globalThis.PineLabEngine.execute(offsetSource, { open, high, low, close, volume, time }, "5");
+if (!offsetResult.ok || offsetResult.plots.length !== 2) {
+  throw new Error("Plot offset fixture failed to execute.");
 }
 
 const taSource = `//@version=6
