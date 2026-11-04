@@ -121,6 +121,30 @@ if (!mtfResult.plots[1].values.some(Number.isFinite) || !mtfResult.plots[2].valu
   throw new Error("Higher timeframe synthetic feeds returned no numeric values.");
 }
 
+
+const dailyHaSource = `//@version=6
+indicator("PineLab Daily HA previous candle")
+haTicker = ticker.heikinashi(syminfo.tickerid)
+[haO, haH, haL, haC] = request.security(haTicker, "1D", [open[1], high[1], low[1], close[1]], lookahead=barmerge.lookahead_on)
+plot(haO, "Previous HA Open")
+plot(haH, "Previous HA High")
+plot(haL, "Previous HA Low")
+plot(haC, "Previous HA Close")
+`;
+const haData = { open: [], high: [], low: [], close: [], volume: [], time: [] };
+let haPrice = 2350;
+for (let i = 0; i < 2880; i++) {
+  const o = haPrice, cl = o + Math.sin(i / 11) * 0.7 + 0.015;
+  haData.open.push(o); haData.close.push(cl);
+  haData.high.push(Math.max(o, cl) + 0.4); haData.low.push(Math.min(o, cl) - 0.4);
+  haData.volume.push(100 + (i % 300)); haData.time.push(Date.UTC(2025, 0, 1) + i * 5 * 60_000);
+  haPrice = cl;
+}
+const dailyHaResult = globalThis.PineLabEngine.execute(dailyHaSource, haData, "5", {}, "XAUUSD");
+if (!dailyHaResult.ok) throw new Error("Daily HA 5m test failed: " + (dailyHaResult.errors || []).join("; "));
+if (dailyHaResult.plots.length !== 4 || !dailyHaResult.plots.every(p => p.values.some(Number.isFinite))) {
+  throw new Error("Daily HA previous completed candle did not return all four OHLC values on 5m.");
+}
 const lowerTfSource = `//@version=6
 indicator("PineLab lower timeframe test")
 oneMinute = request.security("NASDAQ:MSFT", "1", close)
@@ -145,4 +169,4 @@ if (!tableResult.ok) throw new Error("Table capture test failed: " + (tableResul
 if (!tableResult.viz) throw new Error("Expected table visualization metadata.");
 if (!tableResult.viz.drawings.some(d => d.kind === "table")) throw new Error("Expected a captured table handle.");
 console.log("Table viz probe: " + JSON.stringify(tableResult.viz).slice(0, 2500));
-console.log("Resin " + result.version + " passed: TA functions, visual primitives, multi-symbol request.security, 1m/60m/D synthetic feeds, and table handle capture.");
+console.log("Resin " + result.version + " passed: TA functions, visual primitives, multi-symbol request.security, 1m/60m/D synthetic feeds, Daily Heikin-Ashi previous-day OHLC on 5m, and table handle capture.");
