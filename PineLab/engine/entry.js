@@ -76,6 +76,34 @@ function syntheticFeed(chartBars, symbol, chartTf, targetTf = chartTf) {
   return out;
 }
 
+function aggregateRealFeed(chartBars, chartTf, targetTf) {
+  const sourceMinutes = tfMinutes(chartTf), targetMinutes = tfMinutes(targetTf);
+  const out = { open: [], high: [], low: [], close: [], volume: [], time: [], timeframe: String(targetTf) };
+  if (targetMinutes < sourceMinutes || targetMinutes % sourceMinutes !== 0) return out;
+  let bucket = null;
+  for (let i = 0; i < chartBars.time.length; i++) {
+    const t = Number(chartBars.time[i]);
+    if (!Number.isFinite(t)) continue;
+    const key = Math.floor(t / (targetMinutes * 60000));
+    if (key !== bucket) {
+      bucket = key;
+      out.open.push(chartBars.open[i]);
+      out.high.push(chartBars.high[i]);
+      out.low.push(chartBars.low[i]);
+      out.close.push(chartBars.close[i]);
+      out.volume.push(chartBars.volume ? chartBars.volume[i] || 0 : 0);
+      out.time.push(t);
+    } else {
+      const j = out.close.length - 1;
+      out.high[j] = Math.max(out.high[j], chartBars.high[i]);
+      out.low[j] = Math.min(out.low[j], chartBars.low[i]);
+      out.close[j] = chartBars.close[i];
+      out.volume[j] += chartBars.volume ? chartBars.volume[i] || 0 : 0;
+    }
+  }
+  return out;
+}
+
 function toHeikinAshi(feed) {
   const out = { open: [], high: [], low: [], close: [], volume: Array.from(feed.volume), time: Array.from(feed.time), timeframe: feed.timeframe };
   for (let i = 0; i < feed.close.length; i++) {
@@ -126,10 +154,10 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
           security[key + ":" + tf] = emptyFeed(tf);
           continue;
         }
-        const feed = syntheticFeed(bars, key, chartTf, tf);
+        const feed = aggregateRealFeed(bars, chartTf, tf);
         security[key + ":" + tf] = wantsHeikinAshi ? toHeikinAshi(feed) : feed;
       }
-      const feed = syntheticFeed(bars, key, chartTf, chartTf);
+      const feed = { ...bars, timeframe: String(chartTf) };
       security[key] = wantsHeikinAshi ? toHeikinAshi(feed) : feed;
     }
     const result = run(compiled, bars, { inputs, security });
@@ -138,4 +166,4 @@ function execute(source, bars, chartTf, inputs = {}, symbol = "SYNTH") {
     return { ok: false, errors: [String(error && error.message || error)], version: VERSION };
   }
 }
-globalThis.PineLabEngine = { execute, transpile, version: VERSION, syntheticFeed, toHeikinAshi };
+globalThis.PineLabEngine = { execute, transpile, version: VERSION, syntheticFeed, aggregateRealFeed, toHeikinAshi };
