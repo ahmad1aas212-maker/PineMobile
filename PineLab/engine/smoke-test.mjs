@@ -54,6 +54,19 @@ if (!visual.viz || !visual.viz.shapes || !visual.viz.hlines || !visual.viz.fills
 if (visual.viz.shapes.length < 1 || visual.viz.chars.length < 1 || visual.viz.arrows.length < 1 || visual.viz.candles.length < 1 || visual.viz.plotbars.length < 1 || visual.viz.hlines.length < 1 || visual.viz.fills.length < 1 || visual.viz.drawings.length < 1) {
   throw new Error("Pine visualization output collections were unexpectedly empty.");
 }
+const offsetSource = `//@version=6
+indicator("PineLab plot offset test", overlay=true)
+plot(close, "Shifted right", offset=3)
+plot(close, "Shifted left", offset=-2)
+`;
+const offsetResult = globalThis.PineLabEngine.execute(offsetSource, { open, high, low, close, volume, time }, "5");
+if (!offsetResult.ok || !offsetResult.viz || offsetResult.viz.plots.length !== 2) {
+  throw new Error("Plot offset fixture failed to execute.");
+}
+if (offsetResult.viz.plots[0].offset !== 3 || offsetResult.viz.plots[1].offset !== -2) {
+  throw new Error("Plot offsets were not preserved in visualization metadata.");
+}
+
 const taSource = `//@version=6
 indicator("PineLab TA test")
 smaValue = ta.sma(close, 14)
