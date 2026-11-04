@@ -1,4 +1,4 @@
-import "./app/src/main/assets/resin-engine.js";
+import "../app/src/main/assets/resin-engine.js";
 
 const n = 80;
 const open = [], high = [], low = [], close = [], volume = [], time = [];
