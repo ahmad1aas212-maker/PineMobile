@@ -49,6 +49,28 @@ function normalizeMarketRows(rows,aggregate=1){
  for(const b of unique){const key=Math.floor(b.t/size)*size;const g=grouped.get(key);if(!g)grouped.set(key,{t:key,o:b.o,h:b.h,l:b.l,c:b.c,v:b.v});else{g.h=Math.max(g.h,b.h);g.l=Math.min(g.l,b.l);g.c=b.c;g.v+=b.v}}
  return [...grouped.values()].sort((a,b)=>a.t-b.t);
 }
+function marketCacheKey(){return 'pinelab:market:'+String($('symbol').value)+':'+tfString()}
+function saveMarketCache(rows,meta){
+ try{localStorage.setItem(marketCacheKey(),JSON.stringify({savedAt:Date.now(),rows,meta:{source:meta.source,interval:meta.interval,range:meta.range,updatedAt:meta.updatedAt,status:meta.status}}));return true}catch(e){return false}
+}
+function loadMarketCache(){
+ try{
+  const raw=localStorage.getItem(marketCacheKey());if(!raw)return null;
+  const cached=JSON.parse(raw);
+  if(!cached||!Array.isArray(cached.rows)||!cached.rows.length)return null;
+  const rows=cached.rows.filter(b=>b&&[b.t,b.o,b.h,b.l,b.c].every(Number.isFinite)&&b.h>=Math.max(b.o,b.c)&&b.l<=Math.min(b.o,b.c));
+  return rows.length?{rows,savedAt:Number(cached.savedAt)||0,meta:cached.meta||{}}:null;
+ }catch(e){return null}
+}
+function showCachedMarket(cached,error){
+ bars=cached.rows;cursor=bars.length;replayStart=0;viewStart=Math.max(0,cursor-visibleBars*.8);followLatest=true;
+ $('replayRange').min=0;$('replayRange').max=bars.length;$('replayRange').value=cursor;
+ const age=Math.max(0,Date.now()-cached.savedAt);
+ marketMeta={...cached.meta,status:'offline-cache',ageSeconds:Math.floor(age/1000),first:bars[0].t,last:bars[bars.length-1].t};
+ $('engineStatus').textContent='بيانات محفوظة · دون اتصال · '+bars.length+' شمعة';
+ $('diagnostics').textContent='تعذر تحديث السوق: '+error+'. يعرض التطبيق آخر بيانات محفوظة محلياً، وليست أسعاراً حية. وقت الحفظ: '+(cached.savedAt?new Date(cached.savedAt).toLocaleString('en-GB',{timeZone:'Asia/Amman'}):'غير معروف')+'.';
+ executeEnabled(false);draw();
+}
 function setMarketError(message){
  $('engineStatus').textContent='تعذّر تحميل بيانات السوق الحقيقية';
  $('diagnostics').textContent=message;
@@ -69,11 +91,12 @@ async function generate(){
   if(!loaded.length)throw new Error('وصل رد من المصدر لكن لم أجد شموع OHLC صالحة. لم يتم عرض بيانات بديلة وهمية.');
   bars=loaded;cursor=bars.length;viewStart=Math.max(0,cursor-visibleBars*.8);followLatest=true;priceZoom=1;priceShift=0;replayStart=0;activePlots=[];activeViz=null;
   marketMeta={source:state.source||'XAUS chart API / Yahoo Finance proxy',interval:req.interval,range:req.range,loadedAt:Date.now(),updatedAt:payload.updated_at||state.as_of||null,ageSeconds:state.age_seconds??null,status:state.status||'unknown',first:bars[0].t,last:bars[bars.length-1].t};
+  saveMarketCache(bars,marketMeta);
   $('replayRange').min=0;$('replayRange').max=bars.length;$('replayRange').value=cursor;
   $('engineStatus').textContent='XAUUSD حقيقي · '+bars.length+' شمعة · '+req.interval+(state.status==='stale'?' · متأخر':'');
   $('diagnostics').textContent='المصدر: '+marketMeta.source+' ('+req.interval+'). حالة المصدر: '+marketMeta.status+'. آخر تحديث للمصدر: '+(marketMeta.updatedAt||'غير معلن')+'. أول شمعة: '+new Date(bars[0].t).toISOString()+' — آخر شمعة: '+new Date(bars[bars.length-1].t).toISOString()+'. '+(marketMeta.ageSeconds!==null?'عمر البيانات بالثواني: '+marketMeta.ageSeconds+'. ':'')+'بيانات الحجم قد لا تمثل تداولاً مركزياً للذهب الفوري.';
   executeEnabled(false);draw();
- }catch(error){setMarketError('لم أتمكن من تحميل بيانات XAUUSD الحقيقية: '+String(error&&error.message||error)+'. تحقق من الإنترنت ثم اضغط تحديث. لن أستبدلها ببيانات اصطناعية.')}
+ }catch(error){const message=String(error&&error.message||error),cached=loadMarketCache();if(cached)showCachedMarket(cached,message);else setMarketError('لم أتمكن من تحميل بيانات XAUUSD الحقيقية: '+message+'. لا توجد بيانات محفوظة لاستخدامها دون اتصال، ولن أستبدلها ببيانات اصطناعية.')}
  finally{marketLoading=false;$('regen').disabled=false}
 }
 function scheduleMarketRefresh(){
