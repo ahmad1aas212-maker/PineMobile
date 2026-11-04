@@ -139,12 +139,12 @@ chartCanvas.addEventListener('pointerdown',e=>{
  if(e.pointerType==='mouse'&&e.button!==0)return;
  chartCanvas.setPointerCapture(e.pointerId);activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});followLatest=false;chartCanvas.classList.add('dragging');
  if(activePointers.size===1)dragState={x:e.clientX,y:e.clientY,start:viewStart===null?Math.max(0,cursor-visibleBars*.8):viewStart,shift:priceShift};
- else if(activePointers.size===2){const pts=[...activePointers.values()],mid=pointerMidpoint(pts[0],pts[1]),rect=chartCanvas.getBoundingClientRect();pinchState={distance:Math.max(1,pointerDistance(pts[0],pts[1])),visible:visibleBars,priceZoom,anchor:viewStart+(mid.x-rect.left)/rect.width*visibleBars,midY:mid.y};dragState=null;}
+ else if(activePointers.size===2){const pts=[...activePointers.values()],mid=pointerMidpoint(pts[0],pts[1]),rect=chartCanvas.getBoundingClientRect();pinchState={distance:Math.max(1,pointerDistance(pts[0],pts[1])),visible:visibleBars,priceZoom,priceShift,anchor:viewStart+(mid.x-rect.left)/rect.width*visibleBars,midY:mid.y};dragState=null;}
 });
 chartCanvas.addEventListener('pointermove',e=>{
  if(!activePointers.has(e.pointerId))return;activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const rect=chartCanvas.getBoundingClientRect();
  if(activePointers.size>=2&&pinchState){const pts=[...activePointers.values()],mid=pointerMidpoint(pts[0],pts[1]),distance=Math.max(1,pointerDistance(pts[0],pts[1])),ratio=pinchState.distance/distance,mx=(mid.x-rect.left)/rect.width;
- visibleBars=Math.max(8,Math.min(500,pinchState.visible*ratio));viewStart=pinchState.anchor-mx*visibleBars;priceZoom=Math.max(.25,Math.min(12,pinchState.priceZoom/ratio));priceShift+=(pinchState.midY-mid.y)/(rect.height-36)*priceZoom;draw();return;}
+ visibleBars=Math.max(8,Math.min(500,pinchState.visible*ratio));viewStart=pinchState.anchor-mx*visibleBars;priceZoom=Math.max(.25,Math.min(12,pinchState.priceZoom/ratio));priceShift=pinchState.priceShift+(pinchState.midY-mid.y)/(rect.height-36)*priceZoom;draw();return;}
  if(dragState&&activePointers.size===1){viewStart=dragState.start-(e.clientX-dragState.x)/(rect.width/visibleBars);priceShift=dragState.shift+(e.clientY-dragState.y)/(rect.height-36)*priceZoom;draw();}
 });
 function releasePointer(e){activePointers.delete(e.pointerId);if(activePointers.size<2)pinchState=null;if(activePointers.size===1){const p=[...activePointers.values()][0];dragState={x:p.x,y:p.y,start:viewStart,shift:priceShift};}else dragState=null;if(activePointers.size===0)chartCanvas.classList.remove('dragging');}
